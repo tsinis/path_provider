@@ -56,7 +56,7 @@ pub unsafe extern "C" fn ppn_init_android(_files_dir: *const c_char) {}
 ///
 /// # Safety
 /// `ptr` must either be null or a pointer returned by one of the `ppn_*` getters in this
-/// library. Double-free or freeing foreign memory is undefined behaviour.
+/// library. Double-free or freeing foreign memory is undefined operation.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ppn_free(ptr: *mut c_char) {
     if !ptr.is_null() {

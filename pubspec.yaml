@@ -9,7 +9,7 @@ environment:
 dependencies:
   ffi: ^2.2.0
   hooks: ^1.0.2
-  jni: ^0.14.0 # Used only behind Platform.isAndroid, lazily.
+  jni: ^0.15.2 # Used only behind Platform.isAndroid, lazily.
   native_toolchain_rust: ^1.0.3
 
 dev_dependencies:

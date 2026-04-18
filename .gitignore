@@ -146,3 +146,4 @@ nohup.out
 **/example/android/app/.cxx/*
 **/example/benchmarks/*.json
 **/example/.metadata
+**/example/comparison.json

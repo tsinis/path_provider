@@ -131,8 +131,8 @@ dart_code_metrics:
     - prefer-correct-identifier-length:
         # i for index, x/y for math operations, sb for StringBuffer, io for IO,
         # bc for BuildContext, a and b are convenient for sorting, e for the element,
-        # k for key, v for value.
-        exceptions: ["a", "b", "e", "i", "k", "v", "x", "y", "io", "bc", "sb"]
+        # k for key, v for value, fn for function.
+        exceptions: ["a", "b", "e", "i", "k", "v", "x", "y", "io", "bc", "sb", "fn"]
     - avoid-long-parameter-list:
         ignore-optional: true
     - avoid-type-casts:

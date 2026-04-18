@@ -35,7 +35,7 @@ jobs:
       - name: 🩹 CI trick - pretend no JNI
         run: |
           rm -rf example/
-          sed -i '/^[[:space:]]*jni:/ s/^/# /' pubspec.yaml
+          sed -i -E '/^[[:space:]]*jni(_flutter)?:/ s/^/# /' pubspec.yaml
           cat > lib/src/jni.dart <<'EOF'
           void initJniIfNeeded() {} //ignore:prefer-static-class,no-empty-block, it's hack.
           EOF

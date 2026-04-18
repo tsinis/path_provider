@@ -5,16 +5,14 @@ Rust-powered via `dart:ffi`; no platform channels, no `Future`s, no platform fol
 
 ## Layout
 
-| Path         | Role                                                                   |
-| ------------ | ---------------------------------------------------------------------- |
-| `Cargo.toml` / `src/` | Rust crate `path_provider_native` — thin wrapper over `sysdirs` |
-| `lib/` / `test/` / `pubspec.yaml` | Pure Dart package published to pub.dev           |
-| `hook/build.dart`     | `native_toolchain_rust` build hook (emits code assets)  |
-| `example/`            | Flutter sample & integration tests, also depends on Google's `path_provider` for cross-validation |
+| Path                              | Role                                                                                              |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `Cargo.toml` / `src/`             | Rust crate `path_provider_native` — thin wrapper over `sysdirs`                                   |
+| `lib/` / `test/` / `pubspec.yaml` | Almost pure Dart package published to pub.dev                                                     |
+| `hook/build.dart`                 | `native_toolchain_rust` build hook (emits code assets)                                            |
+| `example/`                        | Flutter sample & integration tests, also depends on Google's `path_provider` for cross-validation |
 
-Rust and Dart are first-class citizens at the repo root. Flutter only enters the
-picture through `example/` (and through `package:jni` for the one lazy
-`Context.getFilesDir()` call used to initialise `sysdirs` on Android).
+Rust and Dart are first-class citizens at the repo root. Flutter only enters the picture through `example/` (and through `package:jni` for the one lazy `Context.getFilesDir()` call used to initialise `sysdirs` on Android).
 
 ## API — drop-in replacement
 

@@ -91,9 +91,9 @@ reviews:
 
     - path: "lib/src/**/*.dart"
       instructions: >
-        Public Dart API (pure Dart, no Flutter dependency outside the Android init path).
+        Public Dart API (almost pure Dart).
 
-        - `PathProviderNative` getters are synchronous and return `String?`; do not
+        - `PathProviderNative` getters are synchronous and return `Directory?`; do not
           reintroduce `Future`, `async`, or `await`.
         - `package:jni` must only be touched inside the Android-only helper, and only
           guarded behind `Platform.isAndroid` plus lazy init.

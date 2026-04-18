@@ -1,38 +1,18 @@
-import 'dart:io' show Directory, Platform;
+// ignore_for_file: avoid-ignoring-return-values, we don't need return value from it.
+import 'dart:io' show Platform;
 
 import 'package:flutter/widgets.dart';
-import 'package:path_provider/path_provider.dart' as pp;
-import 'package:path_provider_native/path_provider_native.dart' as ppn;
+import 'comparison.dart';
 
-Future<Map<String, Comparsion>?> main(List<String> args) async {
-  // ignore: avoid-ignoring-return-values, we don't need return value from it.
+void main() async {
   if (Platform.isAndroid) WidgetsFlutterBinding.ensureInitialized();
-  final comparisonMap = {
-    'applicationCache': await Comparsion.create(
-      ppn.getApplicationCacheDirectory(),
-      pp.getApplicationCacheDirectory(),
-    ),
-    'applicationDocuments': await Comparsion.create(
-      ppn.getApplicationDocumentsDirectory(),
-      pp.getApplicationDocumentsDirectory(),
-    ),
-    'applicationSupport': await Comparsion.create(
-      ppn.getApplicationSupportDirectory(),
-      pp.getApplicationSupportDirectory(),
-    ),
-    'downloads': await Comparsion.create(ppn.getDownloadsDirectory(), pp.getDownloadsDirectory()),
-    'temporary': await Comparsion.create(ppn.getTemporaryDirectory(), pp.getTemporaryDirectory()),
-  };
-  print('COMPARISON: $comparisonMap'); // ignore: avoid_print, just a demo.
-  if (args.isEmpty) runApp(_HomeScreen(comparisons: comparisonMap));
-
-  return comparisonMap;
+  runApp(_HomeScreen(comparisons: await Comparison.runComparison));
 }
 
 class _HomeScreen extends StatelessWidget {
   const _HomeScreen({required this.comparisons});
 
-  final Map<String, Comparsion> comparisons;
+  final Map<String, Comparison> comparisons;
 
   @override
   Widget build(BuildContext context) => WidgetsApp(
@@ -65,7 +45,7 @@ class _Row extends StatelessWidget {
   static const _okayColor = Color(0xFF4CAF50);
 
   final String name;
-  final Comparsion comparison;
+  final Comparison comparison;
 
   Color get _statusColor => switch (comparison.isMatching) {
     true => _okayColor,
@@ -99,29 +79,4 @@ class _Row extends StatelessWidget {
       ],
     ),
   );
-}
-
-@pragma('vm:deeply-immutable')
-final class Comparsion {
-  const Comparsion(this._ffi, this._original);
-
-  static Future<Comparsion> create(Directory? ffi, Future<Directory?> original) async =>
-      // ignore: prefer-assigning-await-expressions, to see the future in debug.
-      Comparsion(ffi?.path, (await original)?.path);
-
-  final String? _ffi;
-  final String? _original;
-
-  bool? get isMatching {
-    if (_original == null && _ffi == null) return true;
-    if (_ffi?.isEmpty ?? true) return false;
-
-    return _ffi == _original ? true : null;
-  }
-
-  String get ffi => _ffi ?? 'null';
-  String get original => _original ?? 'null';
-
-  @override
-  String toString() => 'orig: $original\nrust: $ffi\n';
 }

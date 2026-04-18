@@ -1,0 +1,69 @@
+name: 🐦 Flutter Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/flutter_check.yaml"
+      - "example/**/*.dart"
+      - "example/pubspec.yaml"
+  pull_request:
+    paths:
+      - ".github/workflows/flutter_check.yaml"
+      - "example/**/*.dart"
+      - "example/pubspec.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter:
+    name: 🐦 Flutter Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: example
+
+    steps:
+      - name: 📚 Git checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          cache: true
+
+      - name: 📦 Install dependencies
+        run: flutter pub upgrade
+
+      - name: 🕵️ Analyze code
+        uses: ValentinVignal/action-dart-analyze@v2.1
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          fail-on: note
+          fail-on-format: true
+          format: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: example
+
+      - name: 🛂 Fix file system permissions
+        if: false # TODO(tsinis) - re-enable when example tests are added.
+        run: sudo chown -R runner:runner $(pwd) && sudo chmod -R 777 $(pwd)
+
+      - name: 🔬 Run Flutter tests with coverage
+        if: false # TODO(tsinis) - re-enable when example tests are added.
+        run: flutter test --coverage --no-pub
+
+      - name: 💯 Upload to Codecov
+        if: false # TODO(tsinis) - re-enable when example tests are added.
+        uses: codecov/codecov-action@v6.0.0
+        with:
+          fail_ci_if_error: true
+          files: example/coverage/lcov.info
+          flags: flutter
+          name: flutter
+          override_branch: ${{ github.base_ref }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true

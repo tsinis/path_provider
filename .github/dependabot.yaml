@@ -1,0 +1,80 @@
+version: 2
+enable-beta-ecosystems: true
+updates:
+  # Maintain dependencies for Rust
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "09:00"
+      timezone: "Europe/Vienna"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "rust"
+
+  # Maintain dependencies for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "09:00"
+      timezone: "Europe/Vienna"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github_actions"
+    open-pull-requests-limit: 10
+
+  # Maintain dependencies for Dart
+  - package-ecosystem: "pub"
+    versioning-strategy: increase
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "09:00"
+      timezone: "Europe/Vienna"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "dart"
+
+  # Maintain dependencies for Flutter
+  - package-ecosystem: "pub"
+    versioning-strategy: increase
+    directory: "/example"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "09:00"
+      timezone: "Europe/Vienna"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "flutter"
+
+  # Maintain dependencies for Android (example app)
+  - package-ecosystem: "gradle"
+    directory: "/example/android"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "09:00"
+      timezone: "Europe/Vienna"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "android"

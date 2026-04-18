@@ -1,0 +1,46 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "flagWords": ["teh", "hte"],
+  "ignorePaths": [
+    ".github/**",
+    "**/macos/**",
+    "**/windows/**",
+    "**/linux/**",
+    "**/web/**",
+    "**/ios/**",
+    "**/android/**"
+  ],
+  "ignoreRegExpList": ["\\#[\\w\\-]+"],
+  "dictionaries": [
+    "en_US",
+    "softwareTerms",
+    "rust",
+    "dart_dictionary",
+    "rust_dictionary",
+    "nicknames_dictionary",
+    "other_dictionary"
+  ],
+  "dictionaryDefinitions": [
+    {
+      "name": "dart_dictionary",
+      "path": "dart_dictionary.txt",
+      "addWords": true
+    },
+    {
+      "name": "rust_dictionary",
+      "path": "rust_dictionary.txt",
+      "addWords": true
+    },
+    {
+      "name": "nicknames_dictionary",
+      "path": "nicknames_dictionary.txt",
+      "addWords": true
+    },
+    {
+      "name": "other_dictionary",
+      "path": "other_dictionary.txt",
+      "addWords": true
+    }
+  ]
+}

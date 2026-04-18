@@ -1,0 +1,74 @@
+name: 🚀 Pull Request Check
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-name:
+    name: 🔀 Check Branch Name
+    runs-on: ubuntu-slim
+    timeout-minutes: 4
+    steps:
+      - name: 🔀 Assert Branch Naming Convention
+        uses: lekterable/branchlint-action@2.1.0
+        with:
+          errorMessage: 'Branch name should only contain latin characters, numbers and those symbols: ".", "/", "-", "_" and must start with: `feature/`, `feat/`, `test/`, `tests/`, `fix/`, `bug/`, `chore/`, `deps/`, `ci/`, `build/`, `docs/`, `doc/`, `style/` or `refactor/`.'
+          allowed: /(feature|feat|test|tests|fix|bug|chore|dependabot|deps|ci|build|docs|doc|style|refactor)\/([a-zA-Z0-9_.\/-]*)/
+
+  assign:
+    name: ✍🏻 Auto-assign PR
+    runs-on: ubuntu-slim
+    timeout-minutes: 4
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    steps:
+      - name: ✍🏻 Assign pull request
+        uses: actions/github-script@v9.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              assignees: ["tsinis"],
+            });
+
+  reviewers:
+    name: 🧐 Auto-assign reviewers
+    runs-on: ubuntu-slim
+    timeout-minutes: 4
+    if: github.event.pull_request.user.login != 'tsinis'
+    steps:
+      - name: 🧐 Assign PR Reviewers
+        uses: actions/github-script@v9.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              reviewers: ["tsinis"],
+            });
+
+  pr-title:
+    name: 📰 Lint PR Title
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: 📰 Lint Pull Request Title
+        uses: amannn/action-semantic-pull-request@v6.1.1
+        with:
+          requireScope: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

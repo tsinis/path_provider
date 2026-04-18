@@ -1,0 +1,9 @@
+{
+  "languages": {
+    "Dart": {
+      "preferred_line_length": 100
+    }
+  },
+  "show_wrap_guides": true,
+  "wrap_guides": [100]
+}

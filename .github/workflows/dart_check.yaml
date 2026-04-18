@@ -53,7 +53,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🏜️ Publish dry-run
-        if: ${{ github.event_name == 'pull_request' }}
+        if: false # TODO(tsinis) when ready to publish revert to ${{ github.event_name == 'pull_request' }}
         run: dart pub publish --dry-run
 
       - name: 🧮 Check PANA score

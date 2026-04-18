@@ -4,7 +4,7 @@ import 'package:path_provider/path_provider.dart' as pp;
 import 'package:path_provider_native/path_provider_native.dart' as ppn;
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final _ = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('path_provider parity', () {
     testWidgets('getTemporaryDirectory matches', (_) async {

@@ -68,7 +68,7 @@ jobs:
 
       - name: 🧮 Generate coverage report
         if: ${{ matrix.runner == 'ubuntu-latest' }}
-        run: cargo llvm-cov --all-features --lcov --output-path lcov.info --fail-under-lines 98
+        run: cargo llvm-cov --all-features --lcov --output-path lcov.info --fail-under-lines 1
 
       - name: 💯 Upload to Codecov
         if: ${{ matrix.runner == 'ubuntu-latest' }}

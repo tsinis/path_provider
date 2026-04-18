@@ -49,12 +49,15 @@ jobs:
           working-directory: example
 
       - name: 🛂 Fix file system permissions
+        if: false # TODO(tsinis) - re-enable when example tests are added.
         run: sudo chown -R runner:runner $(pwd) && sudo chmod -R 777 $(pwd)
 
       - name: 🔬 Run Flutter tests with coverage
+        if: false # TODO(tsinis) - re-enable when example tests are added.
         run: flutter test --coverage --no-pub
 
       - name: 💯 Upload to Codecov
+        if: false # TODO(tsinis) - re-enable when example tests are added.
         uses: codecov/codecov-action@v6.0.0
         with:
           fail_ci_if_error: true

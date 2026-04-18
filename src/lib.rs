@@ -6,9 +6,12 @@
 //!   MUST free them by calling `ppn_free`. Returning a null pointer signals "directory
 //!   unavailable on this platform" — this is the only valid `null` in the public API.
 
-use std::ffi::{CStr, CString, c_char};
+use std::ffi::{CString, c_char};
 use std::path::PathBuf;
 use std::ptr;
+
+#[cfg(target_os = "android")]
+use std::ffi::CStr;
 
 /// Convert an optional path to a heap-allocated C string. Returns `null` for `None`
 /// (directory not available on this platform) or when the path contains an interior
@@ -41,6 +44,10 @@ pub unsafe extern "C" fn ppn_init_android(files_dir: *const c_char) {
 }
 
 /// No-op on non-Android targets so the symbol always exists.
+///
+/// # Safety
+/// This is always safe on non-Android targets, as it is a no-op. On Android, see the
+/// Android-specific variant for safety requirements.
 #[cfg(not(target_os = "android"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ppn_init_android(_files_dir: *const c_char) {}

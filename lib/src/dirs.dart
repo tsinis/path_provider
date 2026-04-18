@@ -1,17 +1,16 @@
 // ignore_for_file: prefer-static-class, to match `path_provider`'s API style.
-
 import 'dart:ffi';
 import 'dart:io' show Directory, Platform;
 
-import 'android.dart';
 import 'ffi/bindings.dart';
+import 'jni.dart';
 
 bool _isAndroidInitialized = false;
 
 String? _path(Pointer<Char> Function() fn) {
   if (Platform.isAndroid && !_isAndroidInitialized) {
     _isAndroidInitialized = true;
-    initAndroidIfNeeded();
+    initJnifNeeded();
   }
 
   return callDir(fn);

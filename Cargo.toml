@@ -1,0 +1,15 @@
+[package]
+name = "path_provider"
+version = "0.0.1"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+sysdirs = "0.9.4"
+
+[profile.release]
+lto = "thin"
+strip = "debuginfo"

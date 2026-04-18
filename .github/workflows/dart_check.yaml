@@ -1,0 +1,71 @@
+name: 🎯 Dart Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dart_check.yaml"
+      - "lib/**/*.dart"
+      - "test/**/*.dart"
+      - "pubspec.yaml"
+  pull_request:
+    paths:
+      - ".github/workflows/dart_check.yaml"
+      - "lib/**/*.dart"
+      - "test/**/*.dart"
+      - "pubspec.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dart:
+    name: 🎯 Dart Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 📚 Git checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: 🎯 Setup Dart
+        uses: dart-lang/setup-dart@v1.7.2
+
+      - name: 📦 Install dependencies
+        run: dart pub get --no-example
+
+      - name: 🕵️ Analyze code
+        uses: ValentinVignal/action-dart-analyze@v2.1
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          fail-on: note
+          fail-on-format: true
+          format: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏜️ Publish dry-run
+        if: ${{ github.event_name == 'pull_request' }}
+        run: dart pub publish --dry-run
+
+      - name: 🧮 Check PANA score
+        if: ${{ github.event_name == 'pull_request' }}
+        # sudo apt-get install -y webp # TODO(tsinis) - add when screenshot is added to pubspec.
+        run: |
+          dart pub global activate pana
+          dart pub global run pana . --no-warning --exit-code-threshold 0
+
+      - name: 🧪 Run tests with coverage # TODO(tsinis) - adjust --fail-under value.
+        run: dart run coverage:test_with_coverage --fail-under=1
+
+      - name: 💯 Upload to Codecov
+        uses: codecov/codecov-action@v6.0.0
+        with:
+          disable_file_fixes: true
+          fail_ci_if_error: true
+          files: coverage/lcov.info
+          flags: dart
+          name: dart
+          override_branch: ${{ github.base_ref }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true

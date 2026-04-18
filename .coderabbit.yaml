@@ -1,0 +1,300 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "en"
+tone_instructions: "Senior-level review. Prioritize FFI safety, Rust performance, and low-level correctness."
+early_access: true
+
+reviews:
+  profile: "assertive"
+  high_level_summary: true
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: false
+  poem: false
+  in_progress_fortune: false
+  estimate_code_review_effort: true
+  suggested_labels: true
+  auto_apply_labels: true
+  suggested_reviewers: false
+  enable_prompt_for_ai_agents: true
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+      - "LLM IGNORE"
+
+  labeling_instructions:
+    # Conventional commit types.
+    - label: "enhancement"
+      instructions: "New user-facing functionality or capability added."
+    - label: "fix"
+      instructions: "Bug fix — corrects incorrect behavior or a regression."
+    - label: "documentation"
+      instructions: "Documentation-only changes (README, CLAUDE.md, doc comments, etc.)."
+    - label: "refactor"
+      instructions: "Code restructuring with no change in external behavior."
+    - label: "test"
+      instructions: "Adding or updating tests only, no production code changes."
+    - label: "ci"
+      instructions: "Changes to CI/CD workflows, GitHub Actions, or build pipelines."
+    - label: "chore"
+      instructions: "Routine maintenance — dependency bumps, tooling config, formatting."
+    - label: "perf"
+      instructions: "Performance improvement with no functional change."
+    - label: "dependencies"
+      instructions: "Changes to build system, Cargo.toml, pubspec.yaml, or build hooks."
+
+    # Language / scope tags.
+    - label: "dart"
+      instructions: "PR touches pure Dart code (lib/ or test/)."
+    - label: "rust"
+      instructions: "PR touches Rust code (src/ or Cargo.toml)."
+    - label: "flutter"
+      instructions: "PR touches Flutter code (example/ directory)."
+
+  path_filters:
+    - "!**/*.lock"
+    - "!build/**"
+    - "!**/target/**"
+    - "!**/.dart_tool/**"
+    - "!**/*.g.dart"
+
+  path_instructions:
+    - path: "src/**/*.rs"
+      instructions: >
+        Review Rust code with extra care for idiomatic patterns and FFI safety:
+
+        - All public FFI functions MUST be `#[unsafe(no_mangle)] pub unsafe extern "C"`.
+        - Prefer safe Rust in internal functions; only `unsafe` at the FFI boundary.
+        - Never let a panic cross the FFI boundary (UB). Wrap risky paths in
+          `std::panic::catch_unwind` and return a null `*const c_char` on panic.
+        - Strings returned to Dart are heap-allocated via `CString::into_raw`;
+          the caller MUST free them via `ppn_free` using `CString::from_raw`.
+        - `ppn_init_android` must be idempotent and accept only a valid
+          NUL-terminated UTF-8 path; reject null pointers.
+        - Keep the `sysdirs` `android-auto` feature DISABLED — `DynamicLibrary.open`
+          does not fire `JNI_OnLoad`, so Android init must stay Dart-driven.
+
+    - path: "lib/**/ffi/**/*.dart"
+      instructions: >
+        FFI binding layer — the most safety-critical Dart code in the project.
+
+        - `@Native` annotations must use `@DefaultAsset('package:path_provider_native/src/ffi/bindings.dart')`.
+        - Symbols must exactly match the Rust `#[no_mangle] pub extern "C"` exports (`ppn_*`).
+        - Every non-null `*const c_char` returned from Rust must be freed via `ppn_free`
+          after being copied into a Dart `String` — the `callDir` helper owns this contract.
+        - Mark leaf FFI calls `isLeaf: true` only when they never call back into Dart.
+
+    - path: "lib/src/**/*.dart"
+      instructions: >
+        Public Dart API (pure Dart, no Flutter dependency outside the Android init path).
+
+        - `PathProviderNative` getters are synchronous and return `String?`; do not
+          reintroduce `Future`, `async`, or `await`.
+        - `package:jni` must only be touched inside the Android-only helper, and only
+          guarded behind `Platform.isAndroid` plus lazy init.
+        - Directory unavailability is expressed as `null`, never as an exception.
+
+    - path: "example/lib/**/*.dart"
+      instructions: >
+        Flutter example app used for manual and integration testing.
+        - Demonstrate `path_provider_native` alongside Google's `path_provider`
+          for cross-validation. Do not introduce app-level business logic.
+
+    - path: "hook/build.dart"
+      instructions: >
+        Dart build hook that invokes RustBuilder from native_toolchain_rust.
+        This runs automatically during `dart`/`flutter build`/`flutter run`.
+        Ensure `assetName` matches the `@DefaultAsset` path in bindings.dart.
+        The Rust crate lives at the repo root (Cargo.toml in repo root).
+
+    - path: ".github/workflows/*.yaml"
+      instructions: >
+        GitHub Actions CI workflows. This project has three separate checks:
+        dart_check.yaml (pure Dart analysis and tests for lib/ and test/),
+        flutter_check.yaml (Flutter analysis and tests for example/),
+        rust_check.yaml (Cargo clippy, fmt, test, coverage for the repo-root crate).
+        Workflow files live directly in .github/workflows/ (not .github/).
+        Check that path triggers match the corresponding source directories.
+
+  pre_merge_checks:
+    title:
+      mode: "warning"
+      requirements: >
+        PR title MUST follow Conventional Commits format:
+        `type(optional-scope): description`. Allowed types: feat, fix, docs,
+        refactor, test, ci, chore, perf, deps. Scope is optional but if present
+        should be: dart, rust, flutter, ffi, android, or build. Title should be
+        lowercase after the colon, max ~72 characters total.
+    description:
+      mode: "warning"
+    docstrings:
+      mode: "off"
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: true
+
+  slop_detection:
+    enabled: true
+
+  tools:
+    # Relevant to this project.
+    clippy:
+      enabled: true
+    actionlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    shellcheck:
+      enabled: true
+
+    # Not used in this project.
+    ruff:
+      enabled: false
+    flake8:
+      enabled: false
+    pylint:
+      enabled: false
+    biome:
+      enabled: false
+    eslint:
+      enabled: false
+    oxc:
+      enabled: false
+    golangci-lint:
+      enabled: false
+    phpstan:
+      enabled: false
+    phpmd:
+      enabled: false
+    phpcs:
+      enabled: false
+    rubocop:
+      enabled: false
+    brakeman:
+      enabled: false
+    pmd:
+      enabled: false
+    detekt:
+      enabled: false
+    hadolint:
+      enabled: false
+    checkov:
+      enabled: false
+    tflint:
+      enabled: false
+    trivy:
+      enabled: false
+    circleci:
+      enabled: false
+    clang:
+      enabled: false
+    cppcheck:
+      enabled: false
+    buf:
+      enabled: false
+    regal:
+      enabled: false
+    sqlfluff:
+      enabled: false
+    semgrep:
+      enabled: false
+    opengrep:
+      enabled: false
+    fortitudeLint:
+      enabled: false
+    prismaLint:
+      enabled: false
+    swiftlint:
+      enabled: false
+    luacheck:
+      enabled: false
+    dotenvLint:
+      enabled: false
+    htmlhint:
+      enabled: false
+    stylelint:
+      enabled: false
+    checkmake:
+      enabled: false
+    blinter:
+      enabled: false
+    smartyLint:
+      enabled: false
+    emberTemplateLint:
+      enabled: false
+    psscriptanalyzer:
+      enabled: false
+    shopifyThemeCheck:
+      enabled: false
+
+chat:
+  art: false
+  auto_reply: true
+
+knowledge_base:
+  web_search:
+    enabled: true
+  learnings:
+    scope: "local"
+  issues:
+    scope: "local"
+  pull_requests:
+    scope: "local"
+
+code_generation:
+  docstrings:
+    language: "en-US"
+    path_instructions:
+      - path: "src/**/*.rs"
+        instructions: >
+          Use `///` doc comments (not `//!`). Include a `# Safety` section for
+          any unsafe function. Explain what the function does in terms a Rust
+          beginner would understand. Mention the Dart-side caller when relevant.
+      - path: "lib/**/*.dart"
+        instructions: >
+          Use `///` dartdoc comments. For FFI bindings, document the memory
+          contract (who allocates, who frees). For public API, include a brief
+          example where useful. Reference the corresponding Rust function name
+          for FFI wrappers.
+      - path: "example/lib/**/*.dart"
+        instructions: >
+          Use `///` dartdoc comments. Document the demo screen's purpose and
+          any `path_provider` vs `path_provider_native` comparisons.
+  unit_tests:
+    path_instructions:
+      - path: "src/**/*.rs"
+        instructions: >
+          Place tests in a `#[cfg(test)] mod tests` block at the bottom of
+          the file. Test both success and error paths (null pointer input,
+          non-UTF-8 paths). Verify `ppn_free` does not double-free.
+      - path: "lib/src/**/*.dart"
+        instructions: >
+          Use `package:test/test.dart` (not flutter_test). Tests go in
+          `test/` mirroring `lib/src/` structure. Use `group()` with the
+          class type as the description. Cover null-return cases for
+          platforms that do not expose a given directory.
+      - path: "example/lib/**/*.dart"
+        instructions: >
+          Use `package:flutter_test/flutter_test.dart`. Integration tests
+          live under `example/integration_test/`. Prefer comparisons
+          against Google's `path_provider` for parity validation.
+
+issue_enrichment:
+  auto_enrich:
+    enabled: true
+  planning:
+    enabled: true

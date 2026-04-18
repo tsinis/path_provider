@@ -1,0 +1,83 @@
+name: 🦀 Rust Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rust_check.yaml"
+      - "src/**/**.rs"
+      - "*.toml"
+  pull_request:
+    paths:
+      - ".github/workflows/rust_check.yaml"
+      - "src/**/**.rs"
+      - "*.toml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: 🦀 Rust Check (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+
+    steps:
+      - name: 📚 Git checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: 🦀 Rust version
+        run: rustc --version && cargo --version
+
+      - name: 🛠️ Install Rust components
+        run: rustup component add rustfmt clippy
+
+      - name: 🗃️ Cache Cargo registry
+        uses: actions/cache@v5.0.5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.rustup/toolchains
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-cargo-
+
+      - name: 📦 Check Cargo dependencies
+        run: cargo fetch
+
+      - name: 🎨 Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: 🔬 Run Clippy (lints)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: 🏗️ Build
+        run: cargo build --all-features
+
+      - name: 🧪 Run tests
+        run: cargo test --all-features
+
+      - name: 📥 Install cargo-llvm-cov
+        if: ${{ matrix.runner == 'ubuntu-latest' }}
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: 🧮 Generate coverage report
+        if: ${{ matrix.runner == 'ubuntu-latest' }}
+        run: cargo llvm-cov --all-features --lcov --output-path lcov.info --fail-under-lines 98
+
+      - name: 💯 Upload to Codecov
+        if: ${{ matrix.runner == 'ubuntu-latest' }}
+        uses: codecov/codecov-action@v6.0.0
+        with:
+          fail_ci_if_error: true
+          files: lcov.info
+          flags: rust
+          name: rust
+          override_branch: ${{ github.base_ref }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true

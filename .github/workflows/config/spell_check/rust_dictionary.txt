@@ -1,0 +1,34 @@
+# Keywords/terms specific to the Rust
+# (clippy / cargo / rustup / rustfmt / rustc etc. come from the bundled `rust` cspell dict.)
+aarrggbb
+argb
+conv
+demul
+demultiply
+demultiplied
+demultiplying
+ffi
+freeable
+imageproc
+libms
+lossily
+misrender
+nonfinite
+pixmap
+pixmaps
+premul
+premultiply
+premultiplied
+premultiplying
+rasterizer
+rects
+roboto
+scanline
+skia
+unpremul
+unpremultiply
+unpremultiplied
+unpremultiplying
+unrotated
+wght
+xywh

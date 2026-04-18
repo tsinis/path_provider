@@ -1,0 +1,88 @@
+include: ../analysis_options.yaml
+
+formatter:
+  page_width: 100
+
+dart_code_metrics:
+  extends:
+    - package:dart_code_metrics_presets/flutter_all.yaml
+  pubspec-rules:
+    # The example app is a sample for integration testing only and will never be published.
+    - prefer-publish-to-none: true
+  rules:
+    - avoid-returning-widgets:
+        allow-nullable: true
+    - prefer-widget-private-members:
+        ignore-static: true
+    - avoid-duplicate-cascades: true
+    - always-remove-listener: true
+    - avoid-border-all: true
+    - avoid-disposing-late-fields: true
+    - avoid-empty-setstate: true
+    - avoid-expanded-as-spacer: true
+    - avoid-flexible-outside-flex: true
+    - avoid-incorrect-image-opacity: true
+    - avoid-inherited-widget-in-initstate: true
+    - avoid-late-context: true
+    - avoid-missing-controller: true
+    - avoid-missing-image-alt: true
+    - avoid-mounted-in-setstate: true
+    - avoid-recursive-widget-calls: true
+    - avoid-shrink-wrap-in-lists: true
+    - avoid-single-child-column-or-row: true
+    - avoid-state-constructors: true
+    - avoid-stateless-widget-initialized-fields: true
+    - avoid-undisposed-instances: true
+    - avoid-unnecessary-gesture-detector: true
+    - avoid-unnecessary-overrides-in-state: true
+    - avoid-unnecessary-setstate: true
+    - avoid-unnecessary-stateful-widgets: true
+    - avoid-wrapping-in-padding: true
+    - check-for-equals-in-render-object-setters: true
+    - consistent-update-render-object: true
+    - dispose-fields: true
+    - pass-existing-future-to-future-builder: true
+    - pass-existing-stream-to-stream-builder: true
+    - prefer-action-button-tooltip: true
+    - prefer-align-over-container: true
+    - prefer-async-callback: true
+    - prefer-center-over-align: true
+    - prefer-compute-over-isolate-run: true
+    - prefer-const-border-radius: true
+    - prefer-constrained-box-over-container: true
+    - prefer-container: true
+    - prefer-correct-edge-insets-constructor: true
+    - prefer-correct-static-icon-provider: true
+    - prefer-dedicated-media-query-methods: true
+    - prefer-define-hero-tag: true
+    - prefer-extracting-callbacks: true
+    - prefer-for-loop-in-children: true
+    - prefer-padding-over-container: true
+    - prefer-single-setstate: true
+    - prefer-single-widget-per-file: true
+    - prefer-sized-box-square: true
+    - prefer-sliver-prefix: true
+    - prefer-spacing: true
+    - prefer-text-rich: true
+    - prefer-transform-over-container: true
+    - prefer-using-list-view: true
+    - prefer-void-callback: true
+    - proper-super-calls: true
+    - use-closest-build-context: true
+    - use-setstate-synchronously: true
+
+linter:
+  rules:
+    avoid_equals_and_hash_code_on_mutable_classes: true
+    avoid_unnecessary_containers: true
+    avoid_web_libraries_in_flutter: true
+    diagnostic_describe_all_properties: true
+    no_logic_in_create_state: true
+    sized_box_for_whitespace: true
+    sized_box_shrink_expand: true
+    sort_child_properties_last: true
+    use_build_context_synchronously: true
+    use_colored_box: true
+    use_decorated_box: true
+    use_full_hex_values_for_flutter_colors: true
+    use_key_in_widget_constructors: true

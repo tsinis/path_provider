@@ -159,9 +159,6 @@ eol
 fbd
 ffi
 fifa
-ltwh
-malloc
-rects
 fileno
 filesystem
 flagcdn
@@ -214,6 +211,7 @@ jetbrains
 jid
 jit
 jks
+jni
 jvm
 jvmargs
 keystore
@@ -229,9 +227,11 @@ lparam
 lpfn
 lproj
 lpsz
+ltwh
 macos
 macosx
 mainfacts
+malloc
 mega
 microsoft
 mingit
@@ -265,6 +265,7 @@ podspec
 pragma
 pubspec
 pyc
+rects
 regexps
 resizable
 rfc

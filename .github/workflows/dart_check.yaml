@@ -34,13 +34,14 @@ jobs:
 
       - name: 🩹 CI trick - pretend no JNI
         run: |
+          rm -rf example/
           sed -i '/^[[:space:]]*jni:/ s/^/# /' pubspec.yaml
           cat > lib/src/jni.dart <<'EOF'
-          void initJnifNeeded() {} //ignore:prefer-static-class,no-empty-block, it's hack.
+          void initJniIfNeeded() {} //ignore:prefer-static-class,no-empty-block, it's hack.
           EOF
 
       - name: 📦 Install dependencies
-        run: dart pub get --no-example
+        run: dart pub upgrade
 
       - name: 🕵️ Analyze code
         uses: ValentinVignal/action-dart-analyze@v2.1

@@ -18,7 +18,9 @@ use std::ffi::CStr;
 /// silent data corruption), or when the path contains an interior NUL byte.
 fn to_cstr(opt: Option<PathBuf>) -> *const c_char {
     let Some(path) = opt else { return ptr::null() };
-    let Some(s) = path.to_str() else { return ptr::null() };
+    let Some(s) = path.to_str() else {
+        return ptr::null();
+    };
     match CString::new(s) {
         Ok(c) => c.into_raw() as *const c_char,
         Err(_) => ptr::null(),

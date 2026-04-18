@@ -13,7 +13,7 @@ import 'ffi/bindings.dart';
 
 @internal
 // ignore: prefer-static-class, it's a fine for internal platform bootstraps.
-void initJnifNeeded() {
+void initJniIfNeeded() {
   final ctx = Jni.androidApplicationContext; // Get Android app context via JNI.
   final ctxClass = JClass.forName('android/content/Context');
   final getFilesDir = ctxClass.instanceMethodId('getFilesDir', '()Ljava/io/File;');
@@ -22,7 +22,7 @@ void initJnifNeeded() {
   final getAbsolutePath = fileClass.instanceMethodId('getAbsolutePath', '()Ljava/lang/String;');
   final jStr = getAbsolutePath(fileObj, JString.type, const []);
   final filesDir = jStr.toDartString(releaseOriginal: true);
-  final ptr = filesDir.toNativeUtf8(); // Pass filesDir to Rust for sysdirs initialization.
+  final ptr = filesDir.toNativeUtf8(allocator: calloc); // Pass filesDir to Rust for sysdirs init.
   try {
     ppn_init_android(ptr.cast<Char>());
   } finally {

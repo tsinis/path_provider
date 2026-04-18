@@ -9,7 +9,7 @@ bool _isAndroidInitialized = false;
 
 String? _path(Pointer<Char> Function() fn) {
   if (Platform.isAndroid && !_isAndroidInitialized) {
-    initJnifNeeded();
+    initJniIfNeeded();
     _isAndroidInitialized = true;
   }
 

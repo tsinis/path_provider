@@ -1,0 +1,19 @@
+version: 0.0.1
+name: path_provider_native
+description: "Synchronous, Dart-only drop-in replacement for path_provider"
+repository: https://github.com/tsinis/path_provider
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  ffi: ^2.2.0
+  hooks: ^1.0.2
+  jni: ^0.14.0 # Used only behind Platform.isAndroid, lazily.
+  native_toolchain_rust: ^1.0.3
+
+dev_dependencies:
+  benchmark_harness: ^2.4.0
+  dart_code_metrics_presets: ^2.30.0
+  lints: ^6.1.0
+  test: ^1.30.0

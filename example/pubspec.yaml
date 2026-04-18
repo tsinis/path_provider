@@ -1,0 +1,25 @@
+version: 0.0.1+0
+name: path_provider_native_example
+description: "Demonstrates path_provider_native alongside Google's path_provider for parity checks."
+publish_to: none
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  path_provider: ^2.1.5
+  path_provider_native:
+    path: ../
+
+dev_dependencies:
+  dart_code_metrics_presets: ^2.30.0
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

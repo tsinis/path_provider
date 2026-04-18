@@ -21,8 +21,8 @@ target
 #.idea/
 
 # FVM Version Cache
-.fvm/
-.fvmrc
+**/.fvm/
+**/.fvmrc
 
 # Claude and other LLM-related files
 CLAUDE.md
@@ -145,3 +145,4 @@ nohup.out
 # Other
 **/example/android/app/.cxx/*
 **/example/benchmarks/*.json
+**/example/.metadata

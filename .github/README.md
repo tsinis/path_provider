@@ -22,23 +22,24 @@ picture through `example/` (and through `package:jni` for the one lazy
 // Before (path_provider)
 import 'package:path_provider/path_provider.dart';
 final dir = await getApplicationCacheDirectory();
-final path = dir.path;
 
 // After (path_provider_native)
 import 'package:path_provider_native/path_provider_native.dart';
-final path = PathProviderNative.applicationCacheDirectory; // String?
+final dir = getApplicationCacheDirectory();
 ```
 
-| `path_provider` (async)                  | `PathProviderNative` (sync)                    |
-| ---------------------------------------- | ---------------------------------------------- |
-| `await getTemporaryDirectory()`          | `PathProviderNative.temporaryDirectory`        |
-| `await getApplicationCacheDirectory()`   | `PathProviderNative.applicationCacheDirectory` |
-| `await getApplicationSupportDirectory()` | `PathProviderNative.applicationSupportDirectory` |
-| `await getApplicationDocumentsDirectory()` | `PathProviderNative.applicationDocumentsDirectory` |
-| `await getDownloadsDirectory()`          | `PathProviderNative.downloadsDirectory`        |
+Same function names, same `Directory` return types, same nullability, same
+`MissingPlatformDirectoryException` / `UnsupportedError` semantics — just no
+`Future` and no `await`.
 
-Every getter returns `String?`. `null` means "not available on this platform"
-(OS sandbox restriction, not a package limitation).
+| `path_provider` (async)                    | `path_provider_native` (sync)        |
+| ------------------------------------------ | ------------------------------------ |
+| `await getTemporaryDirectory()`            | `getTemporaryDirectory()`            |
+| `await getApplicationCacheDirectory()`     | `getApplicationCacheDirectory()`     |
+| `await getApplicationSupportDirectory()`   | `getApplicationSupportDirectory()`   |
+| `await getApplicationDocumentsDirectory()` | `getApplicationDocumentsDirectory()` |
+| `await getLibraryDirectory()`              | `getLibraryDirectory()`              |
+| `await getDownloadsDirectory()`            | `getDownloadsDirectory()`            |
 
 ## Architecture
 

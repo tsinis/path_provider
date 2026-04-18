@@ -78,14 +78,14 @@ dart_code_metrics:
     #   threshold: 0.33
   pubspec-rules:
     # Disabled:
-    - avoid-any-version: false # Defined in the workspace pubspec.yaml
     - prefer-correct-package-name: false # Different naming conventions for Dart and Flutter packages.
     - prefer-pinned-version-syntax: false # Conflicts with prefer-caret-version-syntax.
     - prefer-publish-to-none: false # Those are published packages.
     - prefer-caret-version-syntax: false # Conflicts with avoid-any-version.
+    - add-resolution-workspace: false # It's not a workspace.
 
     # Enabled:
-    - add-resolution-workspace: true
+    - avoid-any-version: true
     - avoid-dependency-overrides: true
     - dependencies-ordering: true
     - newline-before-pubspec-entry: true

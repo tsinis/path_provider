@@ -1,5 +1,5 @@
 [package]
-name = "path_provider"
+name = "path_provider_native"
 version = "0.0.1"
 edition = "2024"
 license = "MIT OR Apache-2.0"

@@ -20,6 +20,7 @@ void main() {
       Platform.isAndroid || Platform.isIOS ? isNull : isNotNull,
       reason: 'Downloads is sandbox-restricted on mobile',
     ),
+    skip: Platform.isLinux ? 'XDG_DOWNLOAD_DIR is unset on headless CI runners' : null,
   );
 
   test(

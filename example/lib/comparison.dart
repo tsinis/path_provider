@@ -1,7 +1,7 @@
 import 'dart:io' show Directory;
 
-import 'package:path_provider/path_provider.dart' as rust;
-import 'package:path_provider_native/path_provider_native.dart' as origin;
+import 'package:path_provider/path_provider.dart' as origin;
+import 'package:path_provider_native/path_provider_native.dart' as rust;
 
 @pragma('vm:deeply-immutable')
 final class Comparison {
@@ -32,24 +32,24 @@ final class Comparison {
   /// Run path provider comparison and return results.
   static Future<Map<String, Comparison>> get runComparison async => {
     'applicationCache': await Comparison.create(
-      origin.getApplicationCacheDirectory(),
       rust.getApplicationCacheDirectory(),
+      origin.getApplicationCacheDirectory(),
     ),
     'applicationDocuments': await Comparison.create(
-      origin.getApplicationDocumentsDirectory(),
       rust.getApplicationDocumentsDirectory(),
+      origin.getApplicationDocumentsDirectory(),
     ),
     'applicationSupport': await Comparison.create(
-      origin.getApplicationSupportDirectory(),
       rust.getApplicationSupportDirectory(),
+      origin.getApplicationSupportDirectory(),
     ),
     'downloads': await Comparison.create(
-      origin.getDownloadsDirectory(),
       rust.getDownloadsDirectory(),
+      origin.getDownloadsDirectory(),
     ),
     'temporary': await Comparison.create(
-      origin.getTemporaryDirectory(),
       rust.getTemporaryDirectory(),
+      origin.getTemporaryDirectory(),
     ),
   };
 }

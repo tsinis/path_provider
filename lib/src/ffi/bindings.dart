@@ -66,8 +66,9 @@ external Pointer<Char> ppn_library_dir();
 String? callDir(Pointer<Char> Function() fn) {
   final ptr = fn();
   if (ptr == nullptr) return null;
-  final result = ptr.cast<Utf8>().toDartString();
-  ppn_free(ptr);
-
-  return result;
+  try {
+    return ptr.cast<Utf8>().toDartString();
+  } finally {
+    ppn_free(ptr);
+  }
 }

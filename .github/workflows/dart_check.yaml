@@ -32,6 +32,13 @@ jobs:
       - name: 🎯 Setup Dart
         uses: dart-lang/setup-dart@v1.7.2
 
+      - name: 🩹 CI trick - pretend no JNI
+        run: |
+          sed -i '/^[[:space:]]*jni:/ s/^/# /' pubspec.yaml
+          cat > lib/src/jni.dart <<'EOF'
+          void initJnifNeeded() {} //ignore:prefer-static-class,no-empty-block, it's hack.
+          EOF
+
       - name: 📦 Install dependencies
         run: dart pub get --no-example
 

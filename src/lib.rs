@@ -14,15 +14,14 @@ use std::ptr;
 use std::ffi::CStr;
 
 /// Convert an optional path to a heap-allocated C string. Returns `null` for `None`
-/// (directory not available on this platform) or when the path contains an interior
-/// NUL byte (should never happen for real filesystem paths but we refuse to panic).
+/// (directory not available on this platform), for non-UTF-8 paths (rejected to avoid
+/// silent data corruption), or when the path contains an interior NUL byte.
 fn to_cstr(opt: Option<PathBuf>) -> *const c_char {
-    match opt {
-        Some(path) => match CString::new(path.to_string_lossy().as_ref()) {
-            Ok(s) => s.into_raw() as *const c_char,
-            Err(_) => ptr::null(),
-        },
-        None => ptr::null(),
+    let Some(path) = opt else { return ptr::null() };
+    let Some(s) = path.to_str() else { return ptr::null() };
+    match CString::new(s) {
+        Ok(c) => c.into_raw() as *const c_char,
+        Err(_) => ptr::null(),
     }
 }
 

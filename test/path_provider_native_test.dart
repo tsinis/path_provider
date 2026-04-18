@@ -22,8 +22,9 @@ void main() {
     ),
   );
 
-  test('getLibraryDirectory throws UnsupportedError off iOS/macOS', () {
-    if (Platform.isIOS || Platform.isMacOS) return;
-    expect(getLibraryDirectory, throwsUnsupportedError);
-  });
+  test(
+    'getLibraryDirectory throws UnsupportedError off iOS/macOS',
+    () => expect(getLibraryDirectory, throwsUnsupportedError),
+    skip: Platform.isIOS || Platform.isMacOS ? 'Supported on iOS/macOS' : null,
+  );
 }

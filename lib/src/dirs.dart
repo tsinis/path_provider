@@ -9,8 +9,8 @@ bool _isAndroidInitialized = false;
 
 String? _path(Pointer<Char> Function() fn) {
   if (Platform.isAndroid && !_isAndroidInitialized) {
-    _isAndroidInitialized = true;
     initJnifNeeded();
+    _isAndroidInitialized = true;
   }
 
   return callDir(fn);

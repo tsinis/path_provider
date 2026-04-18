@@ -45,7 +45,7 @@ Same function names, same `Directory` return types, same nullability, same
 
 Three thin layers, all synchronous:
 
-```
+```text
 ┌────────────────────────────────────────────────────────────────────┐
 │ lib/src/dirs.dart — PathProviderNative static getters              │
 │                                                                    │

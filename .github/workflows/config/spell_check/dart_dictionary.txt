@@ -156,7 +156,6 @@ entrypoint
 enum
 enums
 eol
-esktop
 fbd
 ffi
 fifa

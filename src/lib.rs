@@ -27,6 +27,31 @@ fn to_cstr(opt: Option<PathBuf>) -> *const c_char {
     }
 }
 
+// ─── macOS: bundle identifier helper ─────────────────────────────────────────
+
+/// On macOS, Flutter appends `NSBundle.mainBundle.bundleIdentifier` to
+/// `NSCachesDirectory` and `NSApplicationSupportDirectory`. We replicate that
+/// behavior here.
+#[cfg(target_os = "macos")]
+fn bundle_id() -> Option<String> {
+    use objc2_foundation::NSBundle;
+    let bundle = NSBundle::mainBundle();
+    bundle.bundleIdentifier().map(|s| s.to_string())
+}
+
+/// Append the bundle identifier to a base path (macOS only). Returns the base
+/// path unchanged when the bundle ID is unavailable (e.g. CLI tools).
+#[cfg(target_os = "macos")]
+fn with_bundle_id(base: Option<PathBuf>) -> Option<PathBuf> {
+    let path = base?;
+    match bundle_id() {
+        Some(id) => Some(path.join(id)),
+        None => Some(path),
+    }
+}
+
+// ─── Init (Android) ──────────────────────────────────────────────────────────
+
 /// Initialize `sysdirs` on Android with the app's `filesDir` path. Idempotent.
 ///
 /// # Safety
@@ -53,6 +78,8 @@ pub unsafe extern "C" fn ppn_init_android(files_dir: *const c_char) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ppn_init_android(_files_dir: *const c_char) {}
 
+// ─── Free ────────────────────────────────────────────────────────────────────
+
 /// Free a C string previously returned by any `ppn_*` getter. Null-safe.
 ///
 /// # Safety
@@ -65,6 +92,8 @@ pub unsafe extern "C" fn ppn_free(ptr: *mut c_char) {
     }
 }
 
+// ─── Macro for simple pass-through exports ───────────────────────────────────
+
 macro_rules! dir_export {
     ($name:ident, $sysdirs_fn:ident) => {
         #[unsafe(no_mangle)]
@@ -74,14 +103,85 @@ macro_rules! dir_export {
     };
 }
 
-dir_export!(ppn_temp_dir, temp_dir);
-dir_export!(ppn_cache_dir, cache_dir);
+// ─── Platform-overridden exports ─────────────────────────────────────────────
+
+/// getTemporaryDirectory
+///
+/// - iOS: Flutter uses `NSCachesDirectory` (not `NSTemporaryDirectory` / `<sandbox>/tmp`).
+/// - macOS: Flutter uses `NSCachesDirectory` + bundleIdentifier.
+/// - Others: `sysdirs::temp_dir()` already returns the correct value.
+#[unsafe(no_mangle)]
+pub extern "C" fn ppn_temp_dir() -> *const c_char {
+    #[cfg(target_os = "ios")]
+    {
+        to_cstr(sysdirs::cache_dir())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        to_cstr(with_bundle_id(sysdirs::cache_dir()))
+    }
+    #[cfg(not(any(target_os = "ios", target_os = "macos")))]
+    {
+        to_cstr(sysdirs::temp_dir())
+    }
+}
+
+/// getApplicationCacheDirectory
+///
+/// - macOS: Flutter appends the bundle identifier to `NSCachesDirectory`.
+/// - Others: `sysdirs::cache_dir()` is correct as-is.
+#[unsafe(no_mangle)]
+pub extern "C" fn ppn_cache_dir() -> *const c_char {
+    #[cfg(target_os = "macos")]
+    {
+        to_cstr(with_bundle_id(sysdirs::cache_dir()))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        to_cstr(sysdirs::cache_dir())
+    }
+}
+
+/// getApplicationSupportDirectory
+///
+/// - macOS: Flutter appends the bundle identifier to `NSApplicationSupportDirectory`.
+///   `sysdirs::data_dir()` maps to `NSApplicationSupportDirectory` on macOS.
+/// - Others: `sysdirs::data_dir()` is correct as-is.
+#[unsafe(no_mangle)]
+pub extern "C" fn ppn_data_dir() -> *const c_char {
+    #[cfg(target_os = "macos")]
+    {
+        to_cstr(with_bundle_id(sysdirs::data_dir()))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        to_cstr(sysdirs::data_dir())
+    }
+}
+
+/// getDownloadsDirectory
+///
+/// - iOS: `sysdirs::download_dir()` returns `None`. Flutter resolves
+///   `NSDownloadsDirectory` → `<sandbox>/Downloads`.
+/// - Others: `sysdirs::download_dir()` is correct.
+#[unsafe(no_mangle)]
+pub extern "C" fn ppn_download_dir() -> *const c_char {
+    #[cfg(target_os = "ios")]
+    {
+        to_cstr(sysdirs::home_dir().map(|h| h.join("Downloads")))
+    }
+    #[cfg(not(target_os = "ios"))]
+    {
+        to_cstr(sysdirs::download_dir())
+    }
+}
+
+// ─── Remaining pass-through exports (no platform overrides needed) ───────────
+
 dir_export!(ppn_config_dir, config_dir);
-dir_export!(ppn_data_dir, data_dir);
 dir_export!(ppn_data_local_dir, data_local_dir);
 dir_export!(ppn_home_dir, home_dir);
 dir_export!(ppn_document_dir, document_dir);
-dir_export!(ppn_download_dir, download_dir);
 dir_export!(ppn_picture_dir, picture_dir);
 dir_export!(ppn_audio_dir, audio_dir);
 dir_export!(ppn_video_dir, video_dir);
@@ -89,6 +189,8 @@ dir_export!(ppn_desktop_dir, desktop_dir);
 dir_export!(ppn_public_dir, public_dir);
 dir_export!(ppn_preference_dir, preference_dir);
 dir_export!(ppn_library_dir, library_dir);
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -105,5 +207,12 @@ mod tests {
         if !ptr.is_null() {
             unsafe { ppn_free(ptr) };
         }
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn bundle_id_returns_something() {
+        // In a test binary there may not be a bundle ID, so just verify it doesn't crash.
+        let _ = bundle_id();
     }
 }

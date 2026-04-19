@@ -1,0 +1,144 @@
+[
+  {
+    "label": "Preflight Check: Rust",
+    "command": "bash",
+    "args": [
+      "-lc",
+      "set -euo pipefail; cargo fetch; cargo fmt --all -- --check; cargo clippy --all-targets --all-features -- -D warnings; cargo build --all-features; cargo test --all-features"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT/",
+    "use_new_terminal": true,
+    "tags": [
+      "preflight",
+      "rust"
+    ]
+  },
+  {
+    "label": "Preflight Check: Dart/Flutter",
+    "command": "bash",
+    "args": [
+      "-lc",
+      "set -euo pipefail; dart format .; dart analyze; dart test; dcm analyze .; cd example; flutter analyze; fvm flutter test integration_test -d macos"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT/",
+    "use_new_terminal": true,
+    "tags": [
+      "preflight",
+      "dart",
+      "flutter"
+    ]
+  },
+  {
+    "label": "Flutter: Run",
+    "command": "fvm",
+    "args": [
+      "flutter",
+      "run",
+      "lib/flutter.dart",
+      "--dart-define=print_comparisons=true"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT/example",
+    "use_new_terminal": true,
+    "tags": [
+      "flutter"
+    ]
+  },
+  {
+    "label": "Dart: Test",
+    "command": "dart",
+    "args": [
+      "test"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT/",
+    "tags": [
+      "dart-test"
+    ]
+  },
+  {
+    "label": "Flutter: Test",
+    "command": "fvm",
+    "args": [
+      "flutter",
+      "test"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT/",
+    "tags": [
+      "flutter-test"
+    ]
+  },
+  {
+    "label": "Rust: Clippy",
+    "command": "cargo",
+    "args": [
+      "clippy",
+      "--all-targets",
+      "--all-features",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT/",
+    "tags": [
+      "rust-lint"
+    ]
+  },
+  {
+    "label": "Rust: Test",
+    "command": "cargo",
+    "args": [
+      "test",
+      "--all-features"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT/",
+    "tags": [
+      "rust-test"
+    ]
+  },
+  {
+    "label": "DCM: Analyze All",
+    "command": "dcm",
+    "args": [
+      "analyze",
+      "."
+    ],
+    "tags": [
+      "lint"
+    ]
+  },
+  {
+    "label": "Dart: Analyze",
+    "command": "dart",
+    "args": [
+      "analyze"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT/",
+    "tags": [
+      "dart-lint"
+    ]
+  },
+  {
+    "label": "Flutter: Analyze",
+    "command": "fvm",
+    "args": [
+      "flutter",
+      "analyze"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT/",
+    "tags": [
+      "flutter-lint"
+    ]
+  },
+  {
+    "label": "Flutter: Integration Test",
+    "command": "fvm",
+    "args": [
+      "flutter",
+      "test",
+      "integration_test",
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT/example",
+    "tags": [
+      "flutter-integration-test"
+    ]
+  }
+]

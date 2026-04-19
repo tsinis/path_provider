@@ -5,5 +5,7 @@
     }
   },
   "show_wrap_guides": true,
-  "wrap_guides": [100]
+  "wrap_guides": [
+    100
+  ]
 }

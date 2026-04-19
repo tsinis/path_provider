@@ -55,7 +55,11 @@ mod android {
 
     fn parse_package_name_from_cmdline(bytes: &[u8]) -> Option<String> {
         let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-        String::from_utf8(bytes[..end].to_vec()).ok()
+        let pkg = String::from_utf8(bytes[..end].to_vec()).ok()?;
+        if pkg.is_empty() {
+            return None;
+        }
+        Some(pkg)
     }
 
     fn fallback_base_from_temp_dir(tmp: PathBuf) -> Option<PathBuf> {
@@ -103,6 +107,12 @@ mod android {
                 parse_package_name_from_cmdline(cmdline),
                 Some("com.example.app".to_string())
             );
+        }
+
+        #[test]
+        fn parse_package_name_rejects_empty() {
+            let cmdline = b"\0--flag";
+            assert_eq!(parse_package_name_from_cmdline(cmdline), None);
         }
 
         #[test]
@@ -164,7 +174,9 @@ fn with_bundle_id(base: Option<PathBuf>) -> Option<PathBuf> {
         Some(id) => path.join(id),
         None => path,
     };
-    std::fs::create_dir_all(&result).ok()?;
+    // Keep returning the resolved path even if directory creation fails due to
+    // permissions; callers can decide how to handle an unwritable location.
+    let _ = std::fs::create_dir_all(&result);
     Some(result)
 }
 
@@ -189,6 +201,9 @@ mod linux {
 
     fn gio_application_id() -> Option<String> {
         unsafe {
+            // SAFETY: Symbols are resolved and invoked only while `lib` remains
+            // alive within this scope. On any lookup failure we return `None`
+            // before dereferencing the corresponding function pointer.
             let lib = load_gio_library()?;
             let get_default: libloading::Symbol<unsafe extern "C" fn() -> *mut std::ffi::c_void> =
                 lib.get(b"g_application_get_default").ok()?;
@@ -294,6 +309,7 @@ pub unsafe extern "C" fn ppn_temp_dir() -> *const c_char {
     std::panic::catch_unwind(|| {
         #[cfg(target_os = "android")]
         {
+            // Matches path_provider_android: temporary and cache map to cache dir.
             to_cstr(
                 android::base_dir()
                     .map(|b| b.join("cache"))
@@ -323,6 +339,7 @@ pub unsafe extern "C" fn ppn_cache_dir() -> *const c_char {
     std::panic::catch_unwind(|| {
         #[cfg(target_os = "android")]
         {
+            // Intentionally identical to ppn_temp_dir on Android.
             to_cstr(
                 android::base_dir()
                     .map(|b| b.join("cache"))

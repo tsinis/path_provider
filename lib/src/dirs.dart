@@ -64,7 +64,7 @@ Directory getLibraryDirectory() {
 /// platforms where the OS sandbox does not expose a downloads directory.
 Directory? getDownloadsDirectory() => _optional(ppn_download_dir);
 
-// Additional directories exposed by `sysdirs` beyond Google's `path_provider` surface.
+// Additional directories exposed by `dirs` beyond Google's `path_provider` surface.
 
 Directory? getHomeDirectory() => _optional(ppn_home_dir);
 

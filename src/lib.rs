@@ -14,6 +14,12 @@
 //! `getApplicationCacheDirectory()` are reliable on all devices. All other Android
 //! getters return null and throw `MissingPlatformDirectoryException`; do not use
 //! them in production code.
+//!
+//! ## Linux
+//! `robius-directories` fully handles XDG base dir resolution. The only Linux-specific
+//! code here is app-ID scoping: we append the executable stem to base dirs to match
+//! Flutter's path_provider behavior. No libgio/libloading needed — `/proc/self/exe`
+//! stem is the fallback Flutter itself uses when no GApplication ID is set.
 
 use std::ffi::{CString, c_char};
 use std::path::PathBuf;
@@ -38,9 +44,6 @@ fn to_cstr(opt: Option<PathBuf>) -> *const c_char {
 
 // ─── macOS: bundle identifier helper ─────────────────────────────────────────
 
-/// On macOS, Flutter appends `NSBundle.mainBundle.bundleIdentifier` to
-/// `NSCachesDirectory` and `NSApplicationSupportDirectory`. We replicate that
-/// behavior here.
 #[cfg(target_os = "macos")]
 fn bundle_id() -> Option<String> {
     use objc2_foundation::NSBundle;
@@ -61,7 +64,12 @@ fn with_bundle_id(base: Option<PathBuf>) -> Option<PathBuf> {
     Some(result)
 }
 
-// ─── Linux: app-scoped directories via libgio ────────────────────────────────
+// ─── Linux: app-scoped directories ───────────────────────────────────────────
+//
+// robius-directories resolves all XDG paths correctly — no workarounds needed.
+// The only Linux-specific logic here is scoping: appending the executable name
+// to base dirs so each app gets its own subdirectory (mirrors Flutter behavior).
+// No libgio/libloading: /proc/self/exe stem is the same fallback Flutter uses.
 
 #[cfg(target_os = "linux")]
 mod linux {
@@ -70,67 +78,25 @@ mod linux {
 
     static APP_ID: OnceLock<String> = OnceLock::new();
 
-    /// Load libgio using a runtime-friendly SONAME first, then fall back to the
-    /// unversioned development symlink when available.
-    fn load_gio_library() -> Option<libloading::Library> {
-        const GIO_CANDIDATES: &[&str] = &["libgio-2.0.so.0", "libgio-2.0.so"];
-
-        for candidate in GIO_CANDIDATES {
-            if let Ok(lib) = unsafe { libloading::Library::new(*candidate) } {
-                return Some(lib);
-            }
-        }
-
-        None
-    }
-
-    /// Attempt to read the GApplication ID via libgio (mirrors Flutter's Dart FFI code).
-    fn gio_application_id() -> Option<String> {
-        unsafe {
-            let lib = load_gio_library()?;
-
-            let get_default: libloading::Symbol<unsafe extern "C" fn() -> *mut std::ffi::c_void> =
-                lib.get(b"g_application_get_default").ok()?;
-            let app = get_default();
-            if app.is_null() {
-                return None;
-            }
-
-            let get_id: libloading::Symbol<
-                unsafe extern "C" fn(*mut std::ffi::c_void) -> *const std::ffi::c_char,
-            > = lib.get(b"g_application_get_application_id").ok()?;
-            let id_ptr = get_id(app);
-            if id_ptr.is_null() {
-                return None;
-            }
-
-            // Borrowed pointer from GLib — do not free.
-            std::ffi::CStr::from_ptr(id_ptr)
-                .to_str()
-                .ok()
-                .map(String::from)
-        }
-    }
-
-    /// Executable name fallback (matches Flutter's `_getExecutableName`).
+    /// Executable stem from `/proc/self/exe` — matches Flutter's `_getExecutableName`.
     fn executable_name() -> Option<String> {
         std::fs::read_link("/proc/self/exe")
             .ok()
             .and_then(|p| p.file_stem()?.to_str().map(String::from))
     }
 
-    /// Returns the app ID: GApplication ID → executable name fallback.
+    /// Returns the cached app ID (executable stem). Computed once.
     pub(crate) fn app_id() -> Option<String> {
         if let Some(id) = APP_ID.get() {
             return Some(id.clone());
         }
-        let id = gio_application_id().or_else(executable_name)?;
+        let id = executable_name()?;
         let _ = APP_ID.set(id.clone());
         Some(id)
     }
 
-    /// Base dir + app ID when available; otherwise falls back to the unscoped
-    /// base directory. Creates the resulting directory if needed.
+    /// Appends the app ID to a base dir and ensures it exists.
+    /// Falls through to the unscoped base if app_id() returns None.
     pub(crate) fn scoped(base: Option<PathBuf>) -> Option<PathBuf> {
         let path = base?;
         let result = match app_id() {
@@ -144,13 +110,40 @@ mod linux {
     }
 
     #[cfg(test)]
-    mod tests {
+    pub(crate) mod tests {
         use super::*;
 
         #[test]
-        fn gio_library_load_does_not_crash() {
-            // May return None on systems without libgio; must not panic.
-            let _ = load_gio_library();
+        fn executable_name_resolves() {
+            // /proc/self/exe always resolves in test context.
+            let name = executable_name();
+            assert!(name.is_some(), "executable_name must resolve via /proc/self/exe");
+            assert!(!name.unwrap().is_empty());
+        }
+
+        #[test]
+        fn app_id_is_stable() {
+            // app_id() must return the same value on repeated calls (OnceLock).
+            let a = app_id();
+            let b = app_id();
+            assert_eq!(a, b);
+        }
+
+        #[test]
+        fn scoped_extends_base() {
+            use robius_directories::BaseDirs;
+            let base = BaseDirs::new().map(|b| b.data_dir().to_path_buf());
+            let result = scoped(base.clone());
+            if let (Some(b), Some(s)) = (base, result) {
+                assert!(s.starts_with(&b), "scoped path must extend the base");
+                assert_ne!(s, b, "scoped path must include executable name suffix");
+            }
+        }
+
+        #[test]
+        fn scoped_returns_none_for_unwritable_dir() {
+            let result = scoped(Some(std::path::PathBuf::from("/proc/ppn_test_unwritable")));
+            assert!(result.is_none(), "must return None when dir cannot be created");
         }
     }
 }
@@ -162,7 +155,6 @@ mod linux {
 // Secondary user / work profile → /data/user/<uid/100000>/<pkg>
 // If the derived path is not writable, falls back to std::env::temp_dir()'s
 // parent (Android 13+ sets temp_dir to the app cache dir).
-// Returns None only when every strategy fails — callers treat None as "unavailable".
 
 #[cfg(target_os = "android")]
 mod android {
@@ -171,7 +163,6 @@ mod android {
 
     static BASE: OnceLock<Option<PathBuf>> = OnceLock::new();
 
-    /// Returns the app sandbox base path, computing it once and caching forever.
     pub(crate) fn base_dir() -> Option<PathBuf> {
         BASE.get_or_init(compute).clone()
     }
@@ -193,7 +184,6 @@ mod android {
         }
     }
 
-    /// Read the real UID from `/proc/self/status` and derive the Android user ID.
     /// AOSP formula: `user_id = uid / 100_000`.
     fn user_id_from_proc() -> Option<u64> {
         let status = std::fs::read_to_string("/proc/self/status").ok()?;
@@ -206,7 +196,6 @@ mod android {
         None
     }
 
-    /// Read the package name from `/proc/self/cmdline` (NUL-byte delimited).
     fn package_name_from_cmdline() -> Option<String> {
         let bytes = std::fs::read("/proc/self/cmdline").ok()?;
         let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
@@ -219,7 +208,6 @@ mod android {
 
         #[test]
         fn user_id_from_proc_does_not_crash() {
-            // On Android this will return Some; on other platforms it returns None.
             let _ = user_id_from_proc();
         }
 
@@ -230,8 +218,29 @@ mod android {
 
         #[test]
         fn base_dir_does_not_crash() {
-            // Must not panic; may return None off-device.
             let _ = base_dir();
+        }
+
+        #[test]
+        fn user_id_math_primary_user() {
+            assert_eq!(0u64, 99_999 / 100_000);
+        }
+
+        #[test]
+        fn user_id_math_secondary_user() {
+            assert_eq!(1u64, 110_052 / 100_000);
+            assert_eq!(2u64, 210_052 / 100_000);
+        }
+
+        #[test]
+        fn temp_dir_fallback_strips_cache_suffix() {
+            let tmp = PathBuf::from("/data/user/0/com.example/cache");
+            let parent = if tmp.ends_with("cache") {
+                tmp.parent().map(|p| p.to_path_buf())
+            } else {
+                None
+            };
+            assert_eq!(parent, Some(PathBuf::from("/data/user/0/com.example")));
         }
     }
 }
@@ -241,8 +250,8 @@ mod android {
 /// Free a C string previously returned by any `ppn_*` getter. Null-safe.
 ///
 /// # Safety
-/// `ptr` must either be null or a pointer returned by one of the `ppn_*` getters in this
-/// library. Double-free or freeing foreign memory is undefined operation.
+/// `ptr` must either be null or a pointer returned by one of the `ppn_*` getters
+/// in this library. Double-free or freeing foreign memory is undefined behavior.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ppn_free(ptr: *mut c_char) {
     if !ptr.is_null() {
@@ -250,7 +259,7 @@ pub unsafe extern "C" fn ppn_free(ptr: *mut c_char) {
     }
 }
 
-// ─── Macros for pass-through exports ─────────────────────────────────────────
+// ─── Macros ───────────────────────────────────────────────────────────────────
 
 macro_rules! base_dir_export {
     ($name:ident, $method:ident) => {
@@ -294,24 +303,20 @@ macro_rules! user_dir_export {
     };
 }
 
-// ─── Platform-overridden exports ─────────────────────────────────────────────
+// ─── Exports ─────────────────────────────────────────────────────────────────
 
 /// getTemporaryDirectory
-///
-/// - Android: derives `<sandbox>/cache` from `android::base_dir()`, or falls back
-///   to `std::env::temp_dir()` (Android 13+ maps this to the app cache dir).
-/// - iOS: Uses `NSCachesDirectory` (not `NSTemporaryDirectory`) to match Flutter.
-/// - macOS: Uses `NSCachesDirectory` + bundleIdentifier to match Flutter.
-/// - Others: `std::env::temp_dir()` returns the correct system temp directory.
-///
 /// # Safety
-/// No pointer arguments; always safe to call from Dart FFI.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ppn_temp_dir() -> *const c_char {
     std::panic::catch_unwind(|| {
         #[cfg(target_os = "android")]
         {
-            to_cstr(android::base_dir().map(|b| b.join("cache")).or_else(|| Some(std::env::temp_dir())))
+            to_cstr(
+                android::base_dir()
+                    .map(|b| b.join("cache"))
+                    .or_else(|| Some(std::env::temp_dir())),
+            )
         }
         #[cfg(target_os = "ios")]
         {
@@ -319,7 +324,9 @@ pub unsafe extern "C" fn ppn_temp_dir() -> *const c_char {
         }
         #[cfg(target_os = "macos")]
         {
-            to_cstr(with_bundle_id(BaseDirs::new().map(|b| b.cache_dir().to_path_buf())))
+            to_cstr(with_bundle_id(
+                BaseDirs::new().map(|b| b.cache_dir().to_path_buf()),
+            ))
         }
         #[cfg(not(any(target_os = "android", target_os = "ios", target_os = "macos")))]
         {
@@ -330,29 +337,29 @@ pub unsafe extern "C" fn ppn_temp_dir() -> *const c_char {
 }
 
 /// getApplicationCacheDirectory
-///
-/// - Android: derives `<sandbox>/cache` from `android::base_dir()`, or falls back
-///   to `std::env::temp_dir()` (no JNI = no `Context.getCacheDir()`).
-/// - macOS: Appends the bundle identifier to `NSCachesDirectory` to match Flutter.
-/// - Linux: Scoped by app ID (GApplication ID or executable name).
-/// - Others: `cache_dir` from `BaseDirs`.
-///
 /// # Safety
-/// No pointer arguments; always safe to call from Dart FFI.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ppn_cache_dir() -> *const c_char {
     std::panic::catch_unwind(|| {
         #[cfg(target_os = "android")]
         {
-            to_cstr(android::base_dir().map(|b| b.join("cache")).or_else(|| Some(std::env::temp_dir())))
+            to_cstr(
+                android::base_dir()
+                    .map(|b| b.join("cache"))
+                    .or_else(|| Some(std::env::temp_dir())),
+            )
         }
         #[cfg(target_os = "macos")]
         {
-            to_cstr(with_bundle_id(BaseDirs::new().map(|b| b.cache_dir().to_path_buf())))
+            to_cstr(with_bundle_id(
+                BaseDirs::new().map(|b| b.cache_dir().to_path_buf()),
+            ))
         }
         #[cfg(target_os = "linux")]
         {
-            to_cstr(linux::scoped(BaseDirs::new().map(|b| b.cache_dir().to_path_buf())))
+            to_cstr(linux::scoped(
+                BaseDirs::new().map(|b| b.cache_dir().to_path_buf()),
+            ))
         }
         #[cfg(not(any(target_os = "android", target_os = "macos", target_os = "linux")))]
         {
@@ -363,17 +370,7 @@ pub unsafe extern "C" fn ppn_cache_dir() -> *const c_char {
 }
 
 /// getApplicationSupportDirectory
-///
-/// - Android: derives `<sandbox>/files` from `android::base_dir()` (best effort;
-///   matches `Context.getFilesDir()` on primary user). Returns null when
-///   detection fails.
-/// - macOS: Appends the bundle identifier to `NSApplicationSupportDirectory` to match Flutter.
-///   `BaseDirs::data_dir()` maps to `NSApplicationSupportDirectory` on macOS.
-/// - Linux: Scoped by app ID (GApplication ID or executable name).
-/// - Others: `data_dir` from `BaseDirs`.
-///
 /// # Safety
-/// No pointer arguments; always safe to call from Dart FFI.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ppn_data_dir() -> *const c_char {
     std::panic::catch_unwind(|| {
@@ -383,11 +380,15 @@ pub unsafe extern "C" fn ppn_data_dir() -> *const c_char {
         }
         #[cfg(target_os = "macos")]
         {
-            to_cstr(with_bundle_id(BaseDirs::new().map(|b| b.data_dir().to_path_buf())))
+            to_cstr(with_bundle_id(
+                BaseDirs::new().map(|b| b.data_dir().to_path_buf()),
+            ))
         }
         #[cfg(target_os = "linux")]
         {
-            to_cstr(linux::scoped(BaseDirs::new().map(|b| b.data_dir().to_path_buf())))
+            to_cstr(linux::scoped(
+                BaseDirs::new().map(|b| b.data_dir().to_path_buf()),
+            ))
         }
         #[cfg(not(any(target_os = "android", target_os = "macos", target_os = "linux")))]
         {
@@ -398,13 +399,7 @@ pub unsafe extern "C" fn ppn_data_dir() -> *const c_char {
 }
 
 /// getDownloadsDirectory
-///
-/// - Android: returns null — no sandboxed downloads directory without JNI.
-/// - iOS: `UserDirs::download_dir()` returns `None`; resolves `home_dir/Downloads` instead.
-/// - Others: `download_dir` from `UserDirs`.
-///
 /// # Safety
-/// No pointer arguments; always safe to call from Dart FFI.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ppn_download_dir() -> *const c_char {
     std::panic::catch_unwind(|| {
@@ -424,24 +419,8 @@ pub unsafe extern "C" fn ppn_download_dir() -> *const c_char {
     .unwrap_or(std::ptr::null())
 }
 
-// ─── Remaining pass-through exports ──────────────────────────────────────────
-
-base_dir_export!(ppn_config_dir, config_dir);
-base_dir_export!(ppn_data_local_dir, data_local_dir);
-base_dir_export!(ppn_home_dir, home_dir);
-base_dir_export!(ppn_preference_dir, preference_dir);
-
-user_dir_export!(ppn_document_dir, document_dir);
-user_dir_export!(ppn_picture_dir, picture_dir);
-user_dir_export!(ppn_audio_dir, audio_dir);
-user_dir_export!(ppn_video_dir, video_dir);
-user_dir_export!(ppn_desktop_dir, desktop_dir);
-user_dir_export!(ppn_public_dir, public_dir);
-
-/// getLibraryDirectory — iOS and macOS only; returns null on all other platforms.
-///
+/// getLibraryDirectory — Apple only.
 /// # Safety
-/// No pointer arguments; always safe to call from Dart FFI.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ppn_library_dir() -> *const c_char {
     std::panic::catch_unwind(|| {
@@ -457,6 +436,18 @@ pub unsafe extern "C" fn ppn_library_dir() -> *const c_char {
     .unwrap_or(std::ptr::null())
 }
 
+base_dir_export!(ppn_config_dir, config_dir);
+base_dir_export!(ppn_data_local_dir, data_local_dir);
+base_dir_export!(ppn_home_dir, home_dir);
+base_dir_export!(ppn_preference_dir, preference_dir);
+
+user_dir_export!(ppn_document_dir, document_dir);
+user_dir_export!(ppn_picture_dir, picture_dir);
+user_dir_export!(ppn_audio_dir, audio_dir);
+user_dir_export!(ppn_video_dir, video_dir);
+user_dir_export!(ppn_desktop_dir, desktop_dir);
+user_dir_export!(ppn_public_dir, public_dir);
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -469,10 +460,37 @@ mod tests {
     }
 
     #[test]
-    fn roundtrip_through_free() {
+    fn roundtrip_temp_dir_through_free() {
         let ptr = unsafe { ppn_temp_dir() } as *mut c_char;
         if !ptr.is_null() {
             unsafe { ppn_free(ptr) };
+        }
+    }
+
+    #[test]
+    fn all_getters_do_not_panic() {
+        unsafe {
+            // None of these must panic; null return is fine.
+            let ptrs = [
+                ppn_temp_dir(),
+                ppn_cache_dir(),
+                ppn_data_dir(),
+                ppn_download_dir(),
+                ppn_library_dir(),
+                ppn_config_dir(),
+                ppn_data_local_dir(),
+                ppn_home_dir(),
+                ppn_preference_dir(),
+                ppn_document_dir(),
+                ppn_picture_dir(),
+                ppn_audio_dir(),
+                ppn_video_dir(),
+                ppn_desktop_dir(),
+                ppn_public_dir(),
+            ];
+            for ptr in ptrs {
+                ppn_free(ptr as *mut c_char);
+            }
         }
     }
 
@@ -483,68 +501,72 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os = "linux")]
-    fn linux_app_id_does_not_crash() {
-        // In test context GApplication won't exist — should fall back to executable name.
-        let id = linux::app_id();
-        assert!(id.is_some(), "should at least resolve executable name");
+    #[cfg(target_os = "macos")]
+    fn ppn_cache_dir_non_null_on_macos() {
+        let ptr = unsafe { ppn_cache_dir() };
+        assert!(!ptr.is_null());
+        unsafe { ppn_free(ptr as *mut c_char) };
     }
 
     #[test]
     #[cfg(target_os = "linux")]
-    fn linux_scoped_appends_id() {
-        let base = BaseDirs::new().map(|b| b.data_dir().to_path_buf());
-        let scoped = linux::scoped(base.clone());
-        if let (Some(b), Some(s)) = (base, scoped) {
-            assert!(
-                s.starts_with(&b),
-                "scoped path must extend or equal the base",
-            );
-            // In test context /proc/self/exe always resolves, so the path is extended.
-            assert_ne!(
-                s, b,
-                "scoped path should include the executable name as suffix"
-            );
+    fn ppn_cache_dir_non_null_on_linux() {
+        let ptr = unsafe { ppn_cache_dir() };
+        assert!(!ptr.is_null(), "cache_dir must resolve on Linux");
+        unsafe { ppn_free(ptr as *mut c_char) };
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn ppn_data_dir_non_null_on_linux() {
+        let ptr = unsafe { ppn_data_dir() };
+        assert!(!ptr.is_null(), "data_dir must resolve on Linux");
+        unsafe { ppn_free(ptr as *mut c_char) };
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn linux_xdg_cache_dir_starts_with_home_or_xdg() {
+        let b = robius_directories::BaseDirs::new().unwrap();
+        let cache = b.cache_dir();
+        // Must be either $XDG_CACHE_HOME or $HOME/.cache
+        let home = b.home_dir();
+        let xdg_override = std::env::var("XDG_CACHE_HOME").ok();
+        if let Some(xdg) = xdg_override {
+            assert!(cache.starts_with(&xdg));
+        } else {
+            assert!(cache.starts_with(home));
         }
     }
 
     #[test]
     #[cfg(target_os = "linux")]
-    fn linux_scoped_returns_none_for_unwritable_dir() {
-        // /proc is a read-only virtual filesystem; subdirectory creation must fail.
-        let result = linux::scoped(Some(std::path::PathBuf::from("/proc/ppn_test_unwritable")));
-        assert!(
-            result.is_none(),
-            "scoped must return None when the directory cannot be created",
-        );
+    fn linux_tests() {
+        linux::tests::executable_name_resolves();
+        linux::tests::app_id_is_stable();
+        linux::tests::scoped_returns_none_for_unwritable_dir();
     }
 
+    // Android math tests run on any platform (pure arithmetic).
     #[test]
-    fn android_user_id_math_primary_user() {
-        // uid < 100 000 derives user 0 (single-user / primary device).
+    fn android_user_id_math_primary() {
         assert_eq!(0u64, 99_999 / 100_000);
     }
 
     #[test]
-    fn android_user_id_math_secondary_user() {
-        // uid = 110 052 → user 1 (work profile); uid = 210 052 → user 2.
+    fn android_user_id_math_secondary() {
         assert_eq!(1u64, 110_052 / 100_000);
         assert_eq!(2u64, 210_052 / 100_000);
     }
 
     #[test]
-    fn android_temp_dir_fallback_strips_cache_suffix() {
-        // Verify the fallback logic: a path ending in "cache" strips that component.
-        let tmp = std::path::PathBuf::from("/data/user/0/com.example/cache");
+    fn android_temp_dir_fallback_logic() {
+        let tmp = PathBuf::from("/data/user/0/com.example/cache");
         let parent = if tmp.ends_with("cache") {
             tmp.parent().map(|p| p.to_path_buf())
         } else {
             None
         };
-        assert_eq!(
-            parent,
-            Some(std::path::PathBuf::from("/data/user/0/com.example")),
-            "stripping 'cache' suffix must yield the sandbox root",
-        );
+        assert_eq!(parent, Some(PathBuf::from("/data/user/0/com.example")));
     }
 }

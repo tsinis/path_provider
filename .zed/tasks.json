@@ -18,7 +18,7 @@
     "command": "bash",
     "args": [
       "-lc",
-      "set -euo pipefail; dart format .; dart analyze; dart test; dcm analyze .; cd example; flutter analyze; fvm flutter test integration_test -d macos"
+      "set -euo pipefail; dart format --set-exit-if-changed .; dart analyze; dart test; dcm analyze .; cd example; flutter analyze; fvm flutter test integration_test -d macos"
     ],
     "cwd": "$ZED_WORKTREE_ROOT/",
     "use_new_terminal": true,
@@ -34,7 +34,7 @@
     "args": [
       "flutter",
       "run",
-      "lib/flutter.dart",
+      "--target=lib/flutter.dart",
       "--dart-define=print_comparisons=true"
     ],
     "cwd": "$ZED_WORKTREE_ROOT/example",

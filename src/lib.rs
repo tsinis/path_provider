@@ -44,10 +44,12 @@ fn bundle_id() -> Option<String> {
 #[cfg(target_os = "macos")]
 fn with_bundle_id(base: Option<PathBuf>) -> Option<PathBuf> {
     let path = base?;
-    match bundle_id() {
-        Some(id) => Some(path.join(id)),
-        None => Some(path),
-    }
+    let result = match bundle_id() {
+        Some(id) => path.join(id),
+        None => path,
+    };
+    std::fs::create_dir_all(&result).ok();
+    Some(result)
 }
 
 // ─── Init (Android) ──────────────────────────────────────────────────────────
@@ -96,9 +98,11 @@ pub unsafe extern "C" fn ppn_free(ptr: *mut c_char) {
 
 macro_rules! dir_export {
     ($name:ident, $sysdirs_fn:ident) => {
+        /// # Safety
+        /// No pointer arguments; always safe to call from Dart FFI.
         #[unsafe(no_mangle)]
-        pub extern "C" fn $name() -> *const c_char {
-            to_cstr(sysdirs::$sysdirs_fn())
+        pub unsafe extern "C" fn $name() -> *const c_char {
+            std::panic::catch_unwind(|| to_cstr(sysdirs::$sysdirs_fn())).unwrap_or(std::ptr::null())
         }
     };
 }
@@ -110,36 +114,48 @@ macro_rules! dir_export {
 /// - iOS: Flutter uses `NSCachesDirectory` (not `NSTemporaryDirectory` / `<sandbox>/tmp`).
 /// - macOS: Flutter uses `NSCachesDirectory` + bundleIdentifier.
 /// - Others: `sysdirs::temp_dir()` already returns the correct value.
+///
+/// # Safety
+/// No pointer arguments; always safe to call from Dart FFI.
 #[unsafe(no_mangle)]
-pub extern "C" fn ppn_temp_dir() -> *const c_char {
-    #[cfg(target_os = "ios")]
-    {
-        to_cstr(sysdirs::cache_dir())
-    }
-    #[cfg(target_os = "macos")]
-    {
-        to_cstr(with_bundle_id(sysdirs::cache_dir()))
-    }
-    #[cfg(not(any(target_os = "ios", target_os = "macos")))]
-    {
-        to_cstr(sysdirs::temp_dir())
-    }
+pub unsafe extern "C" fn ppn_temp_dir() -> *const c_char {
+    std::panic::catch_unwind(|| {
+        #[cfg(target_os = "ios")]
+        {
+            to_cstr(sysdirs::cache_dir())
+        }
+        #[cfg(target_os = "macos")]
+        {
+            to_cstr(with_bundle_id(sysdirs::cache_dir()))
+        }
+        #[cfg(not(any(target_os = "ios", target_os = "macos")))]
+        {
+            to_cstr(sysdirs::temp_dir())
+        }
+    })
+    .unwrap_or(std::ptr::null())
 }
 
 /// getApplicationCacheDirectory
 ///
 /// - macOS: Flutter appends the bundle identifier to `NSCachesDirectory`.
 /// - Others: `sysdirs::cache_dir()` is correct as-is.
+///
+/// # Safety
+/// No pointer arguments; always safe to call from Dart FFI.
 #[unsafe(no_mangle)]
-pub extern "C" fn ppn_cache_dir() -> *const c_char {
-    #[cfg(target_os = "macos")]
-    {
-        to_cstr(with_bundle_id(sysdirs::cache_dir()))
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        to_cstr(sysdirs::cache_dir())
-    }
+pub unsafe extern "C" fn ppn_cache_dir() -> *const c_char {
+    std::panic::catch_unwind(|| {
+        #[cfg(target_os = "macos")]
+        {
+            to_cstr(with_bundle_id(sysdirs::cache_dir()))
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            to_cstr(sysdirs::cache_dir())
+        }
+    })
+    .unwrap_or(std::ptr::null())
 }
 
 /// getApplicationSupportDirectory
@@ -147,16 +163,22 @@ pub extern "C" fn ppn_cache_dir() -> *const c_char {
 /// - macOS: Flutter appends the bundle identifier to `NSApplicationSupportDirectory`.
 ///   `sysdirs::data_dir()` maps to `NSApplicationSupportDirectory` on macOS.
 /// - Others: `sysdirs::data_dir()` is correct as-is.
+///
+/// # Safety
+/// No pointer arguments; always safe to call from Dart FFI.
 #[unsafe(no_mangle)]
-pub extern "C" fn ppn_data_dir() -> *const c_char {
-    #[cfg(target_os = "macos")]
-    {
-        to_cstr(with_bundle_id(sysdirs::data_dir()))
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        to_cstr(sysdirs::data_dir())
-    }
+pub unsafe extern "C" fn ppn_data_dir() -> *const c_char {
+    std::panic::catch_unwind(|| {
+        #[cfg(target_os = "macos")]
+        {
+            to_cstr(with_bundle_id(sysdirs::data_dir()))
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            to_cstr(sysdirs::data_dir())
+        }
+    })
+    .unwrap_or(std::ptr::null())
 }
 
 /// getDownloadsDirectory
@@ -164,16 +186,22 @@ pub extern "C" fn ppn_data_dir() -> *const c_char {
 /// - iOS: `sysdirs::download_dir()` returns `None`. Flutter resolves
 ///   `NSDownloadsDirectory` → `<sandbox>/Downloads`.
 /// - Others: `sysdirs::download_dir()` is correct.
+///
+/// # Safety
+/// No pointer arguments; always safe to call from Dart FFI.
 #[unsafe(no_mangle)]
-pub extern "C" fn ppn_download_dir() -> *const c_char {
-    #[cfg(target_os = "ios")]
-    {
-        to_cstr(sysdirs::home_dir().map(|h| h.join("Downloads")))
-    }
-    #[cfg(not(target_os = "ios"))]
-    {
-        to_cstr(sysdirs::download_dir())
-    }
+pub unsafe extern "C" fn ppn_download_dir() -> *const c_char {
+    std::panic::catch_unwind(|| {
+        #[cfg(target_os = "ios")]
+        {
+            to_cstr(sysdirs::home_dir().map(|h| h.join("Downloads")))
+        }
+        #[cfg(not(target_os = "ios"))]
+        {
+            to_cstr(sysdirs::download_dir())
+        }
+    })
+    .unwrap_or(std::ptr::null())
 }
 
 // ─── Remaining pass-through exports (no platform overrides needed) ───────────
@@ -203,7 +231,7 @@ mod tests {
 
     #[test]
     fn roundtrip_through_free() {
-        let ptr = ppn_temp_dir() as *mut c_char;
+        let ptr = unsafe { ppn_temp_dir() } as *mut c_char;
         if !ptr.is_null() {
             unsafe { ppn_free(ptr) };
         }

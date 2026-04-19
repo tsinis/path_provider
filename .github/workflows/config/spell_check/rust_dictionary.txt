@@ -32,3 +32,6 @@ unpremultiplying
 unrotated
 wght
 xywh
+objc2
+objc2_foundation
+nsbundle

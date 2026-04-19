@@ -1,11 +1,9 @@
 // ignore_for_file: avoid-ignoring-return-values, we don't need return value from it.
-import 'dart:io' show Platform;
-
 import 'package:flutter/widgets.dart';
 import 'comparison.dart';
 
 void main() async {
-  if (Platform.isAndroid) WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(_HomeScreen(comparisons: await Comparison.runComparison));
 }
 

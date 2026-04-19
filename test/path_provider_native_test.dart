@@ -32,7 +32,14 @@ void main() {
   group(
     'Linux',
     () {
-      test('getDownloadsDirectory', () => expect(getDownloadsDirectory()?.path, isNotEmpty));
+      test(
+        'getDownloadsDirectory',
+        () => expect(
+          getDownloadsDirectory()?.path,
+          anyOf(isNull, isNotEmpty),
+          reason: 'XDG_DOWNLOAD_DIR may be unset on headless runners',
+        ),
+      );
       test('getTemporaryDirectory', () => expect(getTemporaryDirectory().path, isNotEmpty));
       test(
         'getApplicationSupportDirectory',

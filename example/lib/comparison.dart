@@ -1,5 +1,5 @@
 // ignore_for_file: avoid_print, we want to be able to print comparisons for demonstration purposes.
-import 'dart:io' show Directory;
+import 'dart:io' show Directory, Platform;
 
 import 'package:path_provider/path_provider.dart' as origin;
 import 'package:path_provider_native/path_provider_native.dart' as rust;
@@ -49,10 +49,11 @@ final class Comparison {
         rust.getDownloadsDirectory(),
         origin.getDownloadsDirectory(),
       ),
-      'getLibraryDirectory': await Comparison.create(
-        rust.getLibraryDirectory(),
-        origin.getLibraryDirectory(),
-      ),
+      if (Platform.isIOS || Platform.isMacOS)
+        'getLibraryDirectory': await Comparison.create(
+          rust.getLibraryDirectory(),
+          origin.getLibraryDirectory(),
+        ),
       'getTemporaryDirectory': await Comparison.create(
         rust.getTemporaryDirectory(),
         origin.getTemporaryDirectory(),
@@ -74,7 +75,7 @@ final class Comparison {
     };
 
     // ignore: do_not_use_environment, just for demonstration purposes.
-    if (const bool.hasEnvironment('print_comparisons')) {
+    if (const bool.fromEnvironment('print_comparisons')) {
       print('Comparison results:');
       for (final comparison in comparisons.entries) {
         print('\n"${comparison.key}": ${comparison.value}');

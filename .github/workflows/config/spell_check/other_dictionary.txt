@@ -1,4 +1,3 @@
 # Other keywords/terms
 footgun
 safepoint
-sysdirs

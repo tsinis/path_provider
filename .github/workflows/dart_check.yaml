@@ -32,13 +32,10 @@ jobs:
       - name: 🎯 Setup Dart
         uses: dart-lang/setup-dart@v1.7.2
 
-      - name: 🩹 CI trick - pretend no JNI
+      - name: ✂️ Clean Flutter example/
         run: |
-          rm -rf example/
-          sed -i -E '/^[[:space:]]*jni(_flutter)?:/ s/^/# /' pubspec.yaml
-          cat > lib/src/jni.dart <<'EOF'
-          void initJniIfNeeded() {} //ignore:prefer-static-class,no-empty-block, it's hack.
-          EOF
+          find example/ -type f ! -path "example/lib/main.dart" -delete
+          find example/ -type d -empty -delete
 
       - name: 📦 Install dependencies
         run: dart pub upgrade

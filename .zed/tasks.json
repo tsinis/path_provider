@@ -134,7 +134,7 @@
     "args": [
       "flutter",
       "test",
-      "integration_test",
+      "integration_test"
     ],
     "cwd": "$ZED_WORKTREE_ROOT/example",
     "tags": [

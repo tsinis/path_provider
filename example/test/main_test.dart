@@ -20,43 +20,35 @@ void main() {
     }
   });
 
-  group(
-    'all',
-    () {
-      test(
-        'getDownloadsDirectory',
-        () async => expect(
-          rust.getDownloadsDirectory()?.path,
-          (await origin.getDownloadsDirectory())?.path,
-        ),
-      );
-      test(
-        'getTemporaryDirectory',
-        () async =>
-            expect(rust.getTemporaryDirectory().path, (await origin.getTemporaryDirectory()).path),
-      );
-      test(
-        'getApplicationSupportDirectory',
-        () async => expect(
-          rust.getApplicationSupportDirectory().path,
-          (await origin.getApplicationSupportDirectory()).path,
-        ),
-      );
-      test(
-        'getApplicationDocumentsDirectory',
-        () async => expect(
-          rust.getApplicationDocumentsDirectory().path,
-          (await origin.getApplicationDocumentsDirectory()).path,
-        ),
-      );
-      test(
-        'getApplicationCacheDirectory',
-        () async => expect(
-          rust.getApplicationCacheDirectory().path,
-          (await origin.getApplicationCacheDirectory()).path,
-        ),
-      );
-    },
-    skip: Platform.isLinux, // TODO(tsinis) Enable in GitHub Actions (default Linux runner).
-  );
+  group('real platform', () {
+    test('getDownloadsDirectory', () async {
+      final theirs = (await origin.getDownloadsDirectory())?.path;
+      final ours = rust.getDownloadsDirectory()?.path;
+      expect(theirs, ours);
+    });
+
+    test('getTemporaryDirectory', () async {
+      final theirs = (await origin.getTemporaryDirectory()).path;
+      final ours = rust.getTemporaryDirectory().path;
+      expect(theirs, ours);
+    });
+
+    test('getApplicationSupportDirectory', () async {
+      final theirs = (await origin.getApplicationSupportDirectory()).path;
+      final ours = rust.getApplicationSupportDirectory().path;
+      expect(theirs, ours);
+    });
+
+    test('getApplicationDocumentsDirectory', () async {
+      final theirs = (await origin.getApplicationDocumentsDirectory()).path;
+      final ours = rust.getApplicationDocumentsDirectory().path;
+      expect(theirs, ours);
+    });
+
+    test('getApplicationCacheDirectory', () async {
+      final theirs = (await origin.getApplicationCacheDirectory()).path;
+      final ours = rust.getApplicationCacheDirectory().path;
+      expect(theirs, ours);
+    });
+  });
 }

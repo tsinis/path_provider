@@ -45,10 +45,11 @@ final class Comparison {
         rust.getApplicationSupportDirectory(),
         origin.getApplicationSupportDirectory(),
       ),
-      'getDownloadsDirectory': await Comparison.create(
-        rust.getDownloadsDirectory(),
-        origin.getDownloadsDirectory(),
-      ),
+      if (!Platform.isAndroid)
+        'getDownloadsDirectory': await Comparison.create(
+          rust.getDownloadsDirectory(),
+          origin.getDownloadsDirectory(),
+        ),
       if (Platform.isIOS || Platform.isMacOS)
         'getLibraryDirectory': await Comparison.create(
           rust.getLibraryDirectory(),
@@ -58,20 +59,6 @@ final class Comparison {
         rust.getTemporaryDirectory(),
         origin.getTemporaryDirectory(),
       ),
-      /*
-       'getExternalCacheDirectories': await Comparison.create(
-         rust.getExternalCacheDirectories(),
-         origin.getExternalCacheDirectories(),
-       ), // TODO(tsinis): Android only implement list comparison.
-       'getExternalStorageDirectories': await Comparison.create(
-         rust.getExternalStorageDirectories(),
-         origin.getExternalStorageDirectories(),
-       ), // TODO(tsinis): Android only implement list comparison.
-       'getExternalStorageDirectory': await Comparison.create(
-         rust.getExternalStorageDirectory(),
-         origin.getExternalStorageDirectory(),
-       ),
-       */
     };
 
     // ignore: do_not_use_environment, just for demonstration purposes.

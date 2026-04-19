@@ -1,7 +1,16 @@
-import 'comparison.dart';
+import 'dart:io' show Directory, Platform;
 
-void main() async {
-  final map = await Comparison.runComparison;
-  final hasMatch = map.values.every((i) => i.isMatching == true);
-  print('Result: ${hasMatch ? 'success' : 'failure: $map'}'); // ignore: avoid_print, it's example.
+import 'package:path_provider_native/path_provider_native.dart';
+
+void main() {
+  final map = <String, Directory?>{
+    'getApplicationCacheDirectory': getApplicationCacheDirectory(),
+    'getApplicationSupportDirectory': getApplicationSupportDirectory(),
+    'getDownloadsDirectory': getDownloadsDirectory(),
+    'getTemporaryDirectory': getTemporaryDirectory(),
+    if (!Platform.isAndroid) 'getApplicationDocumentsDirectory': getApplicationDocumentsDirectory(),
+    if (Platform.isIOS || Platform.isMacOS) 'getLibraryDirectory': getLibraryDirectory(),
+  };
+
+  print('Result: $map'); // ignore: avoid_print, it's example.
 }

@@ -10,9 +10,6 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
 @Native<Void Function(Pointer<Char>)>(isLeaf: true)
-external void ppn_init_android(Pointer<Char> filesDir);
-
-@Native<Void Function(Pointer<Char>)>(isLeaf: true)
 external void ppn_free(Pointer<Char> ptr);
 
 @Native<Pointer<Char> Function()>(isLeaf: true)

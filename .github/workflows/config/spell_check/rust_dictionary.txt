@@ -1,11 +1,13 @@
 # Keywords/terms specific to the Rust
 # (clippy / cargo / rustup / rustfmt / rustc etc. come from the bundled `rust` cspell dict.)
 aarrggbb
+aosp
 argb
+cmdline
 conv
 demul
-demultiply
 demultiplied
+demultiply
 demultiplying
 ffi
 freeable
@@ -15,24 +17,26 @@ libms
 lossily
 misrender
 nonfinite
+nsbundle
+objc2
+objc2_foundation
 pixmap
 pixmaps
 premul
-premultiply
 premultiplied
+premultiply
 premultiplying
 rasterizer
 rects
 roboto
+sandboxed
 scanline
 skia
 unpremul
-unpremultiply
 unpremultiplied
+unpremultiply
 unpremultiplying
 unrotated
+unwritable
 wght
 xywh
-objc2
-objc2_foundation
-nsbundle

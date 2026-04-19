@@ -51,6 +51,15 @@ jobs:
       - name: 🛂 Fix file system permissions
         run: sudo chown -R runner:runner $(pwd) && sudo chmod -R 777 $(pwd)
 
+      - name: Set up XDG user directories
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p $HOME/Documents $HOME/Downloads $HOME/.config
+          cat > $HOME/.config/user-dirs.dirs << 'EOF'
+          XDG_DOCUMENTS_DIR="$HOME/Documents"
+          XDG_DOWNLOAD_DIR="$HOME/Downloads"
+          EOF
+
       - name: 🔬 Run Flutter tests with coverage
         run: flutter test --coverage --no-pub
 

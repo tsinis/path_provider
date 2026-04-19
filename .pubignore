@@ -1,0 +1,10 @@
+example/android/**
+example/lib/comparison.dart
+example/lib/flutter.dart
+example/integration_test/**
+example/ios/**
+example/linux/**
+example/macos/**
+example/pubspec.yaml
+example/test/**
+example/windows/**

@@ -74,10 +74,11 @@ reviews:
           `std::panic::catch_unwind` and return a null `*const c_char` on panic.
         - Strings returned to Dart are heap-allocated via `CString::into_raw`;
           the caller MUST free them via `ppn_free` using `CString::from_raw`.
-        - `ppn_init_android` must be idempotent and accept only a valid
-          NUL-terminated UTF-8 path; reject null pointers.
-        - Keep the `sysdirs` `android-auto` feature DISABLED — `DynamicLibrary.open`
-          does not fire `JNI_OnLoad`, so Android init must stay Dart-driven.
+        - On Android, paths are derived from `/proc` entries (no JNI). Only
+          `ppn_temp_dir`, `ppn_cache_dir`, `ppn_data_dir`, and `ppn_document_dir`
+          are reliable. Optional getters may return null. Do not add JNI.
+        - `dirs` is excluded on Android (`cfg(not(target_os = "android"))`) so
+          Android path resolution remains custom `/proc`-based.
 
     - path: "lib/**/ffi/**/*.dart"
       instructions: >

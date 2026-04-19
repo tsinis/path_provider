@@ -37,19 +37,19 @@ final class Comparison {
         rust.getApplicationCacheDirectory(),
         origin.getApplicationCacheDirectory(),
       ),
-      if (!Platform.isAndroid)
-        'getApplicationDocumentsDirectory': await Comparison.create(
-          rust.getApplicationDocumentsDirectory(),
-          origin.getApplicationDocumentsDirectory(),
-        ),
+      'getApplicationDocumentsDirectory': await Comparison.create(
+        rust.getApplicationDocumentsDirectory(),
+        origin.getApplicationDocumentsDirectory(),
+      ),
       'getApplicationSupportDirectory': await Comparison.create(
         rust.getApplicationSupportDirectory(),
         origin.getApplicationSupportDirectory(),
       ),
-      'getDownloadsDirectory': await Comparison.create(
-        rust.getDownloadsDirectory(),
-        origin.getDownloadsDirectory(),
-      ),
+      if (!Platform.isAndroid)
+        'getDownloadsDirectory': await Comparison.create(
+          rust.getDownloadsDirectory(),
+          origin.getDownloadsDirectory(),
+        ),
       if (Platform.isIOS || Platform.isMacOS)
         'getLibraryDirectory': await Comparison.create(
           rust.getLibraryDirectory(),

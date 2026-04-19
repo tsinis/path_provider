@@ -8,9 +8,8 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   test('paths match', () async {
-    final comparisonMap = await app.Comparison.runComparison;
-    final isSuccess = comparisonMap.values.every((i) => i.isMatching == true);
-    final reason = jsonEncode(comparisonMap.map((k, v) => MapEntry(k, v.toJson())));
-    expect(isSuccess, isTrue, reason: reason);
+    final comparison = await app.Comparison.runComparison;
+    final hasMatch = comparison.values.every((i) => i.isMatching == true);
+    expect(hasMatch, isTrue, reason: jsonEncode(comparison.map((k, v) => MapEntry(k, v.toJson()))));
   });
 }

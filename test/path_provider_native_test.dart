@@ -28,4 +28,25 @@ void main() {
     () => expect(getLibraryDirectory, throwsUnsupportedError),
     skip: Platform.isIOS || Platform.isMacOS ? 'Supported on iOS/macOS' : null,
   );
+
+  group(
+    'Linux',
+    () {
+      test('getDownloadsDirectory', () => expect(getDownloadsDirectory()?.path, isNotEmpty));
+      test('getTemporaryDirectory', () => expect(getTemporaryDirectory().path, isNotEmpty));
+      test(
+        'getApplicationSupportDirectory',
+        () => expect(getApplicationSupportDirectory().path, isNotEmpty),
+      );
+      test(
+        'getApplicationDocumentsDirectory',
+        () => expect(getApplicationDocumentsDirectory().path, isNotEmpty),
+      );
+      test(
+        'getApplicationCacheDirectory',
+        () => expect(getApplicationCacheDirectory().path, isNotEmpty),
+      );
+    },
+    skip: !Platform.isLinux, // For example on GitHub Actions' default Linux runner.
+  );
 }

@@ -24,7 +24,7 @@ mod android {
         let user_id = user_id_from_proc().unwrap_or(0);
         if let Some(pkg) = package_name_from_cmdline() {
             let candidate = PathBuf::from(format!("/data/user/{}/{}", user_id, pkg));
-            if std::fs::create_dir_all(candidate.join("files")).is_ok() {
+            if std::fs::metadata(&candidate).is_ok() {
                 return Some(candidate);
             }
         }
@@ -204,6 +204,8 @@ mod linux {
             // SAFETY: Symbols are resolved and invoked only while `lib` remains
             // alive within this scope. On any lookup failure we return `None`
             // before dereferencing the corresponding function pointer.
+            // Do not return or store any Symbol or raw function pointer derived
+            // from `lib` beyond this scope.
             let lib = load_gio_library()?;
             let get_default: libloading::Symbol<unsafe extern "C" fn() -> *mut std::ffi::c_void> =
                 lib.get(b"g_application_get_default").ok()?;
@@ -415,7 +417,13 @@ pub unsafe extern "C" fn ppn_document_dir() -> *const c_char {
         }
         #[cfg(not(target_os = "android"))]
         {
-            to_cstr(dirs::document_dir())
+            to_cstr(dirs::document_dir().or_else(|| {
+                dirs::home_dir().map(|h| {
+                    let fallback = h.join("Documents");
+                    let _ = std::fs::create_dir_all(&fallback);
+                    fallback
+                })
+            }))
         }
     })
     .unwrap_or(std::ptr::null())
@@ -523,11 +531,13 @@ mod tests {
 
     #[test]
     #[cfg(target_os = "linux")]
-    fn linux_dirs_document_dir_smoke_non_null() {
+    fn linux_ppn_document_dir_is_non_null() {
+        let ptr = unsafe { ppn_document_dir() };
         assert!(
-            dirs::document_dir().is_some(),
-            "dirs::document_dir should resolve in Linux CI"
+            !ptr.is_null(),
+            "ppn_document_dir should return a path via dirs::document_dir or home/Documents fallback"
         );
+        unsafe { ppn_free(ptr as *mut c_char) };
     }
 
     #[test]

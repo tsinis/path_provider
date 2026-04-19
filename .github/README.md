@@ -5,19 +5,22 @@ Rust-powered via `dart:ffi`; no platform channels, no `Future`s, no platform fol
 
 ## Layout
 
-| Path                              | Role                                                                                                               |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `Cargo.toml` / `src/`             | Rust crate `path_provider_native` — wraps `robius-directories` (non-Android) and `/proc`-based detection (Android) |
-| `lib/` / `test/` / `pubspec.yaml` | Pure Dart package published to pub.dev                                                                             |
-| `hook/build.dart`                 | `native_toolchain_rust` build hook (emits code assets)                                                             |
-| `example/`                        | Flutter sample and integration tests; also depends on Google's `path_provider` for cross-validation                |
+| Path                              | Role                                                                                                 |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `Cargo.toml` / `src/`             | Rust crate `path_provider_native` — wraps `dirs` (non-Android) and `/proc`-based detection (Android) |
+| `lib/` / `test/` / `pubspec.yaml` | Pure Dart package published to pub.dev                                                               |
+| `hook/build.dart`                 | `native_toolchain_rust` build hook (emits code assets)                                               |
+| `example/`                        | Flutter sample and integration tests; also depends on Google's `path_provider` for cross-validation  |
 
 Rust and Dart are first-class citizens at the repo root. Flutter only enters the picture through `example/`.
 
-> **Android note:** only `getTemporaryDirectory()` and `getApplicationCacheDirectory()` are
-> reliable on Android. Paths are derived from `/proc` entries with no JNI and no platform channels.
-> All other Android getters return null (`MissingPlatformDirectoryException`). Do not rely on them
-> in production code.
+> **Android note:** `getTemporaryDirectory()`, `getApplicationCacheDirectory()`,
+> `getApplicationSupportDirectory()`, and `getApplicationDocumentsDirectory()` are
+> reliable on Android. `ppn_data_dir` maps to `<base>/files`; `ppn_document_dir`
+> maps to `<base>/app_flutter` and creates the directory. Paths are derived from
+> `/proc` entries with no JNI and no platform channels. Optional getters return
+> `null`; throws are only for unsupported APIs (for example, `getLibraryDirectory`
+> off iOS/macOS).
 
 ## API — drop-in replacement
 
@@ -60,12 +63,12 @@ Three thin layers, all synchronous:
 │       │                                                            │
 │       ▼ symbol resolution via @DefaultAsset + native_toolchain_rust│
 │                                                                    │
-│ src/lib.rs — ppn_* exports (robius-directories + /proc on Android) │
+│ src/lib.rs — ppn_* exports (dirs + /proc on Android) │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-On Android, `robius-directories` is excluded to avoid a `robius-android-env` splash-screen
-hang. Instead, the `android` module in `src/lib.rs` reads `/proc/self/status` (UID → user ID)
+On Android, `dirs` is excluded to keep Android resolution in the custom `/proc` path.
+The `android` module in `src/lib.rs` reads `/proc/self/status` (UID → user ID)
 and `/proc/self/cmdline` (package name) to derive the sandbox path without JNI.
 
 ## Testing

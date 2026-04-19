@@ -75,10 +75,10 @@ reviews:
         - Strings returned to Dart are heap-allocated via `CString::into_raw`;
           the caller MUST free them via `ppn_free` using `CString::from_raw`.
         - On Android, paths are derived from `/proc` entries (no JNI). Only
-          `ppn_temp_dir` and `ppn_cache_dir` are reliable; all other Android
-          exports intentionally return null. Do not add JNI or `ppn_init_android`.
-        - `robius-directories` is excluded on Android (`cfg(not(target_os = "android"))`)
-          to prevent the `robius-android-env` splash-screen hang.
+          `ppn_temp_dir`, `ppn_cache_dir`, `ppn_data_dir`, and `ppn_document_dir`
+          are reliable. Optional getters may return null. Do not add JNI.
+        - `dirs` is excluded on Android (`cfg(not(target_os = "android"))`) so
+          Android path resolution remains custom `/proc`-based.
 
     - path: "lib/**/ffi/**/*.dart"
       instructions: >

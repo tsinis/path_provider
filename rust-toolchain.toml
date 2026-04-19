@@ -3,7 +3,9 @@
 # You must specify a version number/date in order to ensure reproducible builds.
 channel = "1.94.1" # or newer. another example: `nightly-2025-01-01`
 
-# The targets this crate supports — mirrors the platforms `dirs` resolves natively.
+# The targets this crate supports. Most mirror platforms `dirs` resolves natively,
+# but Android uses custom `/proc`-based resolution with `dirs` behind
+# `cfg(not(target_os = "android"))` in Cargo.toml.
 targets = [
   # Android
   "armv7-linux-androideabi",

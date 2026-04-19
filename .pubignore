@@ -1,6 +1,6 @@
 example/android/**
-example/comparison.dart
-example/flutter.dart
+example/lib/comparison.dart
+example/lib/flutter.dart
 example/integration_test/**
 example/ios/**
 example/linux/**

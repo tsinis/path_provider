@@ -4,11 +4,11 @@ import 'comparison.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(_HomeScreen(comparisons: await Comparison.runComparison));
+  runApp(_Flutter(comparisons: await Comparison.runComparison));
 }
 
-class _HomeScreen extends StatelessWidget {
-  const _HomeScreen({required this.comparisons});
+class _Flutter extends StatelessWidget {
+  const _Flutter({required this.comparisons});
 
   final Map<String, Comparison> comparisons;
 

@@ -1,18 +1,23 @@
 # path_provider_native
 
-Synchronous, await-free drop-in replacement for [`path_provider`](https://pub.dev/packages/path_provider).
+Synchronous, await-free pure Dart drop-in replacement for [`path_provider`](https://pub.dev/packages/path_provider).
 Rust-powered via `dart:ffi`; no platform channels, no `Future`s, no platform folders.
 
 ## Layout
 
-| Path                              | Role                                                                                              |
-| --------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `Cargo.toml` / `src/`             | Rust crate `path_provider_native` — thin wrapper over `sysdirs`                                   |
-| `lib/` / `test/` / `pubspec.yaml` | Almost pure Dart package published to pub.dev                                                     |
-| `hook/build.dart`                 | `native_toolchain_rust` build hook (emits code assets)                                            |
-| `example/`                        | Flutter sample & integration tests, also depends on Google's `path_provider` for cross-validation |
+| Path                              | Role                                                                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `Cargo.toml` / `src/`             | Rust crate `path_provider_native` — wraps `robius-directories` (non-Android) and `/proc`-based detection (Android) |
+| `lib/` / `test/` / `pubspec.yaml` | Pure Dart package published to pub.dev                                                                             |
+| `hook/build.dart`                 | `native_toolchain_rust` build hook (emits code assets)                                                             |
+| `example/`                        | Flutter sample and integration tests; also depends on Google's `path_provider` for cross-validation                |
 
-Rust and Dart are first-class citizens at the repo root. Flutter only enters the picture through `example/` (and through `package:jni` for the one lazy `Context.getFilesDir()` call used to initialise `sysdirs` on Android).
+Rust and Dart are first-class citizens at the repo root. Flutter only enters the picture through `example/`.
+
+> **Android note:** only `getTemporaryDirectory()` and `getApplicationCacheDirectory()` are
+> reliable on Android. Paths are derived from `/proc` entries with no JNI and no platform channels.
+> All other Android getters return null (`MissingPlatformDirectoryException`). Do not rely on them
+> in production code.
 
 ## API — drop-in replacement
 
@@ -45,24 +50,23 @@ Three thin layers, all synchronous:
 
 ```text
 ┌────────────────────────────────────────────────────────────────────┐
-│ lib/src/dirs.dart — PathProviderNative static getters              │
+│ lib/src/dirs.dart — global sync functions                          │
 │                                                                    │
-│   PathProviderNative.applicationCacheDirectory                     │
+│   getApplicationCacheDirectory()                                   │
 │       │                                                            │
-│       ▼ (lazy Android init on first call via package:jni)          │
+│       ▼                                                            │
 │                                                                    │
 │ lib/src/ffi/bindings.dart — hand-written @Native() annotations     │
 │       │                                                            │
 │       ▼ symbol resolution via @DefaultAsset + native_toolchain_rust│
 │                                                                    │
-│ src/lib.rs — ppn_* exports wrap the sysdirs crate                  │
+│ src/lib.rs — ppn_* exports (robius-directories + /proc on Android) │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-`DynamicLibrary.open` does not fire `JNI_OnLoad`, so the `android-auto` feature
-of `sysdirs` is deliberately disabled. On Android, Dart resolves
-`Context.getFilesDir().getAbsolutePath()` synchronously via `package:jni` and
-passes it to `ppn_init_android` on the first directory access.
+On Android, `robius-directories` is excluded to avoid a `robius-android-env` splash-screen
+hang. Instead, the `android` module in `src/lib.rs` reads `/proc/self/status` (UID → user ID)
+and `/proc/self/cmdline` (package name) to derive the sandbox path without JNI.
 
 ## Testing
 

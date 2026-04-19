@@ -3,18 +3,8 @@ import 'dart:ffi';
 import 'dart:io' show Directory, Platform;
 
 import 'ffi/bindings.dart';
-import 'jni.dart';
 
-bool _isAndroidInitialized = false;
-
-String? _path(Pointer<Char> Function() fn) {
-  if (Platform.isAndroid && !_isAndroidInitialized) {
-    initJniIfNeeded();
-    _isAndroidInitialized = true;
-  }
-
-  return callDir(fn);
-}
+String? _path(Pointer<Char> Function() fn) => callDir(fn);
 
 Directory _required(Pointer<Char> Function() fn, String name) {
   final path = _path(fn);
@@ -55,11 +45,8 @@ Directory getTemporaryDirectory() => _required(ppn_temp_dir, 'temporary');
 Directory getApplicationSupportDirectory() => _required(ppn_data_dir, 'application support');
 
 /// Synchronous mirror of `path_provider.getApplicationDocumentsDirectory()`.
-/// On Android, `sysdirs` has no native concept of a documents directory, so we
-/// fall back to the files directory — matching what Google's `path_provider`
-/// returns (`Context.getFilesDir()`).
 Directory getApplicationDocumentsDirectory() =>
-    _required(Platform.isAndroid ? ppn_data_dir : ppn_document_dir, 'application documents');
+    _required(ppn_document_dir, 'application documents');
 
 /// Synchronous mirror of `path_provider.getApplicationCacheDirectory()`.
 Directory getApplicationCacheDirectory() => _required(ppn_cache_dir, 'application cache');

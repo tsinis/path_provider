@@ -48,8 +48,72 @@ fn with_bundle_id(base: Option<PathBuf>) -> Option<PathBuf> {
         Some(id) => path.join(id),
         None => path,
     };
-    std::fs::create_dir_all(&result).ok();
+    std::fs::create_dir_all(&result).ok()?;
     Some(result)
+}
+
+// ─── Linux: app-scoped directories via libgio ────────────────────────────────
+
+#[cfg(target_os = "linux")]
+mod linux {
+    use std::path::PathBuf;
+    use std::sync::OnceLock;
+
+    static APP_ID: OnceLock<String> = OnceLock::new();
+
+    /// Attempt to read the GApplication ID via libgio (mirrors Flutter's Dart FFI code).
+    fn gio_application_id() -> Option<String> {
+        unsafe {
+            let lib = libloading::Library::new("libgio-2.0.so").ok()?;
+
+            let get_default: libloading::Symbol<unsafe extern "C" fn() -> *mut std::ffi::c_void> =
+                lib.get(b"g_application_get_default").ok()?;
+            let app = get_default();
+            if app.is_null() {
+                return None;
+            }
+
+            let get_id: libloading::Symbol<
+                unsafe extern "C" fn(*mut std::ffi::c_void) -> *const std::ffi::c_char,
+            > = lib.get(b"g_application_get_application_id").ok()?;
+            let id_ptr = get_id(app);
+            if id_ptr.is_null() {
+                return None;
+            }
+
+            // Borrowed pointer from GLib — do not free.
+            std::ffi::CStr::from_ptr(id_ptr)
+                .to_str()
+                .ok()
+                .map(String::from)
+        }
+    }
+
+    /// Executable name fallback (matches Flutter's `_getExecutableName`).
+    fn executable_name() -> Option<String> {
+        std::fs::read_link("/proc/self/exe")
+            .ok()
+            .and_then(|p| p.file_stem()?.to_str().map(String::from))
+    }
+
+    /// Returns the app ID: GApplication ID → executable name fallback.
+    pub(crate) fn app_id() -> Option<String> {
+        if let Some(id) = APP_ID.get() {
+            return Some(id.clone());
+        }
+        let id = gio_application_id().or_else(executable_name)?;
+        let _ = APP_ID.set(id.clone());
+        Some(id)
+    }
+
+    /// Base dir + app ID. Creates the directory if needed.
+    pub(crate) fn scoped(base: Option<PathBuf>) -> Option<PathBuf> {
+        let path = base?;
+        let id = app_id()?;
+        let result = path.join(id);
+        std::fs::create_dir_all(&result).ok();
+        Some(result)
+    }
 }
 
 // ─── Init (Android) ──────────────────────────────────────────────────────────
@@ -68,7 +132,8 @@ pub unsafe extern "C" fn ppn_init_android(files_dir: *const c_char) {
     let Ok(path) = (unsafe { CStr::from_ptr(files_dir) }).to_str() else {
         return;
     };
-    sysdirs::init_android(path);
+    let path = path.to_owned();
+    let _ = std::panic::catch_unwind(|| sysdirs::init_android(path.as_str()));
 }
 
 /// No-op on non-Android targets so the symbol always exists.
@@ -150,7 +215,11 @@ pub unsafe extern "C" fn ppn_cache_dir() -> *const c_char {
         {
             to_cstr(with_bundle_id(sysdirs::cache_dir()))
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "linux")]
+        {
+            to_cstr(linux::scoped(sysdirs::cache_dir()))
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         {
             to_cstr(sysdirs::cache_dir())
         }
@@ -173,7 +242,11 @@ pub unsafe extern "C" fn ppn_data_dir() -> *const c_char {
         {
             to_cstr(with_bundle_id(sysdirs::data_dir()))
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "linux")]
+        {
+            to_cstr(linux::scoped(sysdirs::data_dir()))
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         {
             to_cstr(sysdirs::data_dir())
         }
@@ -204,7 +277,7 @@ pub unsafe extern "C" fn ppn_download_dir() -> *const c_char {
     .unwrap_or(std::ptr::null())
 }
 
-// ─── Remaining pass-through exports (no platform overrides needed) ───────────
+// ─── Remaining pass-through exports ──────────────────────────────────────────
 
 dir_export!(ppn_config_dir, config_dir);
 dir_export!(ppn_data_local_dir, data_local_dir);
@@ -242,5 +315,24 @@ mod tests {
     fn bundle_id_returns_something() {
         // In a test binary there may not be a bundle ID, so just verify it doesn't crash.
         let _ = bundle_id();
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn linux_app_id_does_not_crash() {
+        // In test context GApplication won't exist — should fall back to executable name.
+        let id = linux::app_id();
+        assert!(id.is_some(), "should at least resolve executable name");
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn linux_scoped_appends_id() {
+        let base = sysdirs::data_dir();
+        let scoped = linux::scoped(base.clone());
+        if let (Some(b), Some(s)) = (base, scoped) {
+            assert!(s.starts_with(&b), "scoped path should extend base");
+            assert_ne!(s, b, "scoped path should differ from base");
+        }
     }
 }

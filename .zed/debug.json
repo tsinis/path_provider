@@ -5,5 +5,5 @@
     "type": "dart",
     "request": "launch",
     "program": "$ZED_WORKTREE_ROOT/example/lib/main.dart"
-  },
+  }
 ]

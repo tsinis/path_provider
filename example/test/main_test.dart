@@ -57,6 +57,6 @@ void main() {
         ),
       );
     },
-    skip: Platform.isLinux, // TODO(tsinis) Enable in GitHub Actions (default Linux runner).
+    skip: !Platform.isLinux, // Enable in GitHub Actions (default Linux runner).
   );
 }

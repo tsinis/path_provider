@@ -252,6 +252,7 @@ nonnull
 notoemoji
 nsh
 nullptr
+objc
 opensource
 openstreetmap
 parallelizable

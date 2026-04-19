@@ -10,6 +10,7 @@ demultiplying
 ffi
 freeable
 imageproc
+libgio
 libms
 lossily
 misrender
@@ -32,3 +33,6 @@ unpremultiplying
 unrotated
 wght
 xywh
+objc2
+objc2_foundation
+nsbundle

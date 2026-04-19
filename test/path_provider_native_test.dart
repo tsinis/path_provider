@@ -28,4 +28,32 @@ void main() {
     () => expect(getLibraryDirectory, throwsUnsupportedError),
     skip: Platform.isIOS || Platform.isMacOS ? 'Supported on iOS/macOS' : null,
   );
+
+  group(
+    'Linux',
+    () {
+      test(
+        'getDownloadsDirectory',
+        () => expect(
+          getDownloadsDirectory()?.path,
+          anyOf(isNull, isNotEmpty),
+          reason: 'XDG_DOWNLOAD_DIR may be unset on headless runners',
+        ),
+      );
+      test('getTemporaryDirectory', () => expect(getTemporaryDirectory().path, isNotEmpty));
+      test(
+        'getApplicationSupportDirectory',
+        () => expect(getApplicationSupportDirectory().path, isNotEmpty),
+      );
+      test(
+        'getApplicationDocumentsDirectory',
+        () => expect(getApplicationDocumentsDirectory().path, isNotEmpty),
+      );
+      test(
+        'getApplicationCacheDirectory',
+        () => expect(getApplicationCacheDirectory().path, isNotEmpty),
+      );
+    },
+    skip: Platform.isLinux, // For example on GitHub Actions' default Linux runner.
+  );
 }

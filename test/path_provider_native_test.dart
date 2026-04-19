@@ -47,6 +47,6 @@ void main() {
         () => expect(getApplicationCacheDirectory().path, isNotEmpty),
       );
     },
-    skip: !Platform.isLinux, // For example on GitHub Actions' default Linux runner.
+    skip: Platform.isLinux, // For example on GitHub Actions' default Linux runner.
   );
 }

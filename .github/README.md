@@ -7,7 +7,7 @@ Rust-powered via `dart:ffi`; no platform channels, no `Future`s, no platform fol
 
 | Path                              | Role                                                                                                |
 | --------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `Cargo.toml` / `src/`             | Rust crate `path_provider_dart` — wraps `dirs` (non-Android) and `/proc`-based detection (Android)  |
+| `Cargo.toml` / `src/`             | Rust crate `path_provider` — wraps `dirs` (non-Android) and `/proc`-based detection (Android)       |
 | `lib/` / `test/` / `pubspec.yaml` | Pure Dart package published to pub.dev                                                              |
 | `hook/build.dart`                 | `native_toolchain_rust` build hook (emits code assets)                                              |
 | `example/`                        | Flutter sample and integration tests; also depends on Google's `path_provider` for cross-validation |
@@ -105,5 +105,5 @@ flutter run                                              # pick a device
 flutter test integration_test/                           # integration tests
 ```
 
-The example app mounts both `path_provider_dart` and Google's `path_provider`
+The example app mounts both `path_provider_dart` and original `path_provider`
 side by side so parity can be validated on-device.

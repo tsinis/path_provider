@@ -29,119 +29,49 @@ mod android {
             }
         }
         // Android 13+ typically reports <sandbox>/cache as temp_dir.
-        fallback_base_from_temp_dir(std::env::temp_dir())
+        super::fallback_base_from_temp_dir(std::env::temp_dir())
     }
 
     // AOSP formula: user_id = uid / 100_000.
     fn user_id_from_proc() -> Option<u64> {
         let status = std::fs::read_to_string("/proc/self/status").ok()?;
-        parse_user_id_from_status(&status)
+        super::parse_user_id_from_status(&status)
     }
 
     fn package_name_from_cmdline() -> Option<String> {
         let bytes = std::fs::read("/proc/self/cmdline").ok()?;
-        parse_package_name_from_cmdline(&bytes)
+        super::parse_package_name_from_cmdline(&bytes)
     }
+}
 
-    fn parse_user_id_from_status(status: &str) -> Option<u64> {
-        for line in status.lines() {
-            if let Some(rest) = line.strip_prefix("Uid:") {
-                let real_uid: u64 = rest.split_whitespace().next()?.parse().ok()?;
-                return Some(real_uid / 100_000);
-            }
-        }
-        None
-    }
-
-    fn parse_package_name_from_cmdline(bytes: &[u8]) -> Option<String> {
-        let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-        let pkg = String::from_utf8(bytes[..end].to_vec()).ok()?;
-        if pkg.is_empty() {
-            return None;
-        }
-        Some(pkg)
-    }
-
-    fn fallback_base_from_temp_dir(tmp: PathBuf) -> Option<PathBuf> {
-        if tmp.ends_with("cache") {
-            return tmp.parent().map(|p| p.to_path_buf());
-        }
-        None
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-
-        #[test]
-        fn parse_user_id_primary_user() {
-            let status = "Name:\ttest\nUid:\t12345\t12345\t12345\t12345\n";
-            assert_eq!(parse_user_id_from_status(status), Some(0));
-        }
-
-        #[test]
-        fn parse_user_id_secondary_user() {
-            let status = "Name:\ttest\nUid:\t110052\t110052\t110052\t110052\n";
-            assert_eq!(parse_user_id_from_status(status), Some(1));
-        }
-
-        #[test]
-        fn parse_user_id_third_user() {
-            let status = "Name:\ttest\nUid:\t210052\t210052\t210052\t210052\n";
-            assert_eq!(parse_user_id_from_status(status), Some(2));
-        }
-
-        #[test]
-        fn parse_package_name_reads_until_nul() {
-            let cmdline = b"com.example.app\0--flag";
-            assert_eq!(
-                parse_package_name_from_cmdline(cmdline),
-                Some("com.example.app".to_string())
-            );
-        }
-
-        #[test]
-        fn parse_package_name_handles_no_nul() {
-            let cmdline = b"com.example.app";
-            assert_eq!(
-                parse_package_name_from_cmdline(cmdline),
-                Some("com.example.app".to_string())
-            );
-        }
-
-        #[test]
-        fn parse_package_name_rejects_empty() {
-            let cmdline = b"\0--flag";
-            assert_eq!(parse_package_name_from_cmdline(cmdline), None);
-        }
-
-        #[test]
-        fn fallback_from_cache_temp_dir() {
-            let tmp = PathBuf::from("/data/user/1/com.example.app/cache");
-            assert_eq!(
-                fallback_base_from_temp_dir(tmp),
-                Some(PathBuf::from("/data/user/1/com.example.app"))
-            );
-        }
-
-        #[test]
-        fn fallback_returns_none_for_non_cache_temp_dir() {
-            let tmp = PathBuf::from("/tmp");
-            assert_eq!(fallback_base_from_temp_dir(tmp), None);
-        }
-
-        /// documents dir must differ from support dir (app_flutter vs files).
-        #[test]
-        fn documents_dir_differs_from_support_dir() {
-            let base = PathBuf::from("/data/user/0/com.example.app");
-            let support = base.join("files");
-            let documents = base.join("app_flutter");
-            assert_ne!(
-                support, documents,
-                "getApplicationDocumentsDirectory must not equal getApplicationSupportDirectory on Android"
-            );
+// Pure parsing helpers used by the Android module at runtime and by tests on all platforms.
+#[cfg(any(target_os = "android", test))]
+fn parse_user_id_from_status(status: &str) -> Option<u64> {
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("Uid:") {
+            let real_uid: u64 = rest.split_whitespace().next()?.parse().ok()?;
+            return Some(real_uid / 100_000);
         }
     }
+    None
+}
+
+#[cfg(any(target_os = "android", test))]
+fn parse_package_name_from_cmdline(bytes: &[u8]) -> Option<String> {
+    let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+    let pkg = String::from_utf8(bytes[..end].to_vec()).ok()?;
+    if pkg.is_empty() {
+        return None;
+    }
+    Some(pkg)
+}
+
+#[cfg(any(target_os = "android", test))]
+fn fallback_base_from_temp_dir(tmp: PathBuf) -> Option<PathBuf> {
+    if tmp.ends_with("cache") {
+        return tmp.parent().map(|p| p.to_path_buf());
+    }
+    None
 }
 
 /// Convert an optional path to a heap-allocated C string. Returns `null` for `None`
@@ -267,8 +197,53 @@ mod linux {
 
 // ─── Windows helpers ─────────────────────────────────────────────────────────
 
+/// Sanitize a string for use as a Windows path component.
+/// Replaces illegal characters, enforces 255 UTF-16 code units (NTFS limit),
+/// and prefixes Windows reserved device names with `_`.
+#[cfg(any(target_os = "windows", test))]
+fn sanitize(s: String) -> String {
+    const ILLEGAL: &str = "<>:\"/\\|?*";
+    // Replace path-illegal characters and ASCII control characters.
+    let s: String = s
+        .chars()
+        .map(|c| {
+            if c.is_control() || ILLEGAL.contains(c) {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    // Enforce 255 UTF-16 code units (Windows NTFS per-component limit).
+    // BMP chars cost 1 unit; supplementary-plane chars (emoji, rare scripts) cost 2.
+    // Iterating over `char` values never splits a surrogate pair.
+    let s: String = s
+        .trim_end_matches(|c: char| c == '.' || c.is_whitespace())
+        .chars()
+        .scan(0usize, |units, c| {
+            let next = *units + c.len_utf16();
+            if next > 255 {
+                None
+            } else {
+                *units = next;
+                Some(c)
+            }
+        })
+        .collect();
+    // Windows reserved device names must never be used as file/dir components.
+    const RESERVED: &[&str] = &[
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+        "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+    if RESERVED.iter().any(|&r| s.eq_ignore_ascii_case(r)) {
+        return format!("_{s}");
+    }
+    s
+}
+
 #[cfg(target_os = "windows")]
 mod windows_impl {
+    use super::sanitize;
     use std::path::PathBuf;
 
     /// Returns `"CompanyName\ProductName"` read from the running exe's version
@@ -391,35 +366,6 @@ mod windows_impl {
         None
     }
 
-    fn sanitize(s: String) -> String {
-        const ILLEGAL: &str = "<>:\"/\\|?*";
-        // Replace path-illegal characters and ASCII control characters.
-        let s: String = s
-            .chars()
-            .map(|c| {
-                if c.is_control() || ILLEGAL.contains(c) {
-                    '_'
-                } else {
-                    c
-                }
-            })
-            .collect();
-        let s: String = s
-            .trim_end_matches(|c: char| c == '.' || c.is_whitespace())
-            .chars()
-            .take(255)
-            .collect();
-        // Windows reserved device names must never be used as file/dir components.
-        const RESERVED: &[&str] = &[
-            "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
-            "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
-        ];
-        if RESERVED.iter().any(|&r| s.eq_ignore_ascii_case(r)) {
-            return format!("_{s}");
-        }
-        s
-    }
-
     fn exe_stem() -> Option<String> {
         std::env::current_exe()
             .ok()
@@ -437,62 +383,6 @@ mod windows_impl {
     #[cfg(test)]
     mod tests {
         use super::*;
-
-        #[test]
-        fn sanitize_replaces_illegal_chars() {
-            assert_eq!(sanitize("My:Company".to_string()), "My_Company");
-            assert_eq!(sanitize("App/Name".to_string()), "App_Name");
-            assert_eq!(sanitize("A<B>C".to_string()), "A_B_C");
-        }
-
-        #[test]
-        fn sanitize_replaces_control_chars() {
-            assert_eq!(sanitize("App\x00Name".to_string()), "App_Name");
-            assert_eq!(sanitize("App\tName".to_string()), "App_Name");
-            assert_eq!(sanitize("App\nName".to_string()), "App_Name");
-        }
-
-        #[test]
-        fn sanitize_trims_trailing_dots_and_spaces() {
-            assert_eq!(sanitize("App  ".to_string()), "App");
-            assert_eq!(sanitize("App...".to_string()), "App");
-            assert_eq!(sanitize("App. ".to_string()), "App");
-        }
-
-        #[test]
-        fn sanitize_limits_to_255_chars() {
-            let long = "a".repeat(300);
-            assert_eq!(sanitize(long).len(), 255);
-        }
-
-        #[test]
-        fn sanitize_prefixes_reserved_names() {
-            for name in &["CON", "PRN", "AUX", "NUL", "con", "nul"] {
-                let result = sanitize(name.to_string());
-                assert!(
-                    result.starts_with('_'),
-                    "reserved name {name:?} must be prefixed, got {result:?}",
-                );
-            }
-            for n in 1..=9u8 {
-                for prefix in &["COM", "LPT"] {
-                    let name = format!("{prefix}{n}");
-                    let result = sanitize(name.clone());
-                    assert!(
-                        result.starts_with('_'),
-                        "reserved name {name:?} must be prefixed, got {result:?}",
-                    );
-                }
-            }
-        }
-
-        #[test]
-        fn sanitize_keeps_safe_names() {
-            // These are NOT reserved and must pass through unchanged.
-            assert_eq!(sanitize("MyCompany".to_string()), "MyCompany");
-            assert_eq!(sanitize("CONSOLE".to_string()), "CONSOLE");
-            assert_eq!(sanitize("COM10".to_string()), "COM10");
-        }
 
         #[test]
         fn exe_stem_is_non_empty() {
@@ -861,6 +751,63 @@ mod tests {
         assert_ne!(support, documents);
     }
 
+    #[test]
+    fn parse_user_id_primary_user() {
+        let status = "Name:\ttest\nUid:\t12345\t12345\t12345\t12345\n";
+        assert_eq!(parse_user_id_from_status(status), Some(0));
+    }
+
+    #[test]
+    fn parse_user_id_secondary_user() {
+        let status = "Name:\ttest\nUid:\t110052\t110052\t110052\t110052\n";
+        assert_eq!(parse_user_id_from_status(status), Some(1));
+    }
+
+    #[test]
+    fn parse_user_id_third_user() {
+        let status = "Name:\ttest\nUid:\t210052\t210052\t210052\t210052\n";
+        assert_eq!(parse_user_id_from_status(status), Some(2));
+    }
+
+    #[test]
+    fn parse_package_name_reads_until_nul() {
+        let cmdline = b"com.example.app\0--flag";
+        assert_eq!(
+            parse_package_name_from_cmdline(cmdline),
+            Some("com.example.app".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_package_name_handles_no_nul() {
+        let cmdline = b"com.example.app";
+        assert_eq!(
+            parse_package_name_from_cmdline(cmdline),
+            Some("com.example.app".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_package_name_rejects_empty() {
+        let cmdline = b"\0--flag";
+        assert_eq!(parse_package_name_from_cmdline(cmdline), None);
+    }
+
+    #[test]
+    fn fallback_from_cache_temp_dir() {
+        let tmp = PathBuf::from("/data/user/1/com.example.app/cache");
+        assert_eq!(
+            fallback_base_from_temp_dir(tmp),
+            Some(PathBuf::from("/data/user/1/com.example.app"))
+        );
+    }
+
+    #[test]
+    fn fallback_returns_none_for_non_cache_temp_dir() {
+        let tmp = PathBuf::from("/tmp");
+        assert_eq!(fallback_base_from_temp_dir(tmp), None);
+    }
+
     // ── Windows-specific tests ────────────────────────────────────────────────
 
     /// This logic runs on every platform — validates the separator-stripping
@@ -949,5 +896,86 @@ mod tests {
             "data dir must include the app subfolder suffix"
         );
         unsafe { ppn_free(ptr as *mut c_char) };
+    }
+
+    // ── sanitize tests (run on all platforms — pure string logic) ─────────────
+
+    #[test]
+    fn sanitize_replaces_illegal_chars() {
+        assert_eq!(sanitize("My:Company".to_string()), "My_Company");
+        assert_eq!(sanitize("App/Name".to_string()), "App_Name");
+        assert_eq!(sanitize("A<B>C".to_string()), "A_B_C");
+    }
+
+    #[test]
+    fn sanitize_replaces_control_chars() {
+        assert_eq!(sanitize("App\x00Name".to_string()), "App_Name");
+        assert_eq!(sanitize("App\tName".to_string()), "App_Name");
+        assert_eq!(sanitize("App\nName".to_string()), "App_Name");
+    }
+
+    #[test]
+    fn sanitize_trims_trailing_dots_and_spaces() {
+        assert_eq!(sanitize("App  ".to_string()), "App");
+        assert_eq!(sanitize("App...".to_string()), "App");
+        assert_eq!(sanitize("App. ".to_string()), "App");
+    }
+
+    #[test]
+    fn sanitize_limits_to_255_utf16_code_units() {
+        // ASCII: 1 char = 1 UTF-16 code unit — 300 chars capped to 255.
+        let ascii = "a".repeat(300);
+        let result = sanitize(ascii);
+        assert_eq!(result.len(), 255, "ASCII: expected 255 bytes");
+        let utf16: usize = result.chars().map(|c| c.len_utf16()).sum();
+        assert_eq!(utf16, 255, "ASCII: expected 255 UTF-16 code units");
+
+        // CJK: 1 char = 1 UTF-16 code unit — same cap.
+        let cjk = "中".repeat(300);
+        let result = sanitize(cjk);
+        let utf16: usize = result.chars().map(|c| c.len_utf16()).sum();
+        assert_eq!(utf16, 255, "CJK: expected 255 UTF-16 code units");
+
+        // Emoji: 1 char = 2 UTF-16 code units — 128 emoji = 256 units, so cap is 127.
+        let emoji = "😀".repeat(200);
+        let result = sanitize(emoji);
+        let utf16: usize = result.chars().map(|c| c.len_utf16()).sum();
+        assert!(
+            utf16 <= 255,
+            "emoji: UTF-16 code units must not exceed 255, got {utf16}",
+        );
+        // 127 emoji = 254 code units; 128th would push it to 256 — verify exact cap.
+        assert_eq!(
+            utf16, 254,
+            "emoji: expected 254 UTF-16 code units (127 × 2)"
+        );
+    }
+
+    #[test]
+    fn sanitize_prefixes_reserved_names() {
+        for name in &["CON", "PRN", "AUX", "NUL", "con", "nul"] {
+            let result = sanitize(name.to_string());
+            assert!(
+                result.starts_with('_'),
+                "reserved name {name:?} must be prefixed, got {result:?}",
+            );
+        }
+        for n in 1..=9u8 {
+            for prefix in &["COM", "LPT"] {
+                let name = format!("{prefix}{n}");
+                let result = sanitize(name.clone());
+                assert!(
+                    result.starts_with('_'),
+                    "reserved name {name:?} must be prefixed, got {result:?}",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sanitize_keeps_safe_names() {
+        assert_eq!(sanitize("MyCompany".to_string()), "MyCompany");
+        assert_eq!(sanitize("CONSOLE".to_string()), "CONSOLE");
+        assert_eq!(sanitize("COM10".to_string()), "COM10");
     }
 }

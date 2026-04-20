@@ -11,10 +11,12 @@ demultiply
 demultiplying
 ffi
 freeable
+hiword
 imageproc
 libgio
 libms
 lossily
+loword
 misrender
 nonfinite
 nsbundle

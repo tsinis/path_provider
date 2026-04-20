@@ -20,6 +20,7 @@ nonfinite
 nsbundle
 objc2
 objc2_foundation
+pcwstr
 pixmap
 pixmaps
 premul

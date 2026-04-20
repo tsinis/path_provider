@@ -94,10 +94,7 @@ reviews:
       instructions: >
         Public Dart API (pure Dart).
 
-        - `path_provider_dart` methods are synchronous and return `Directory?`; do not
-          reintroduce `Future`, `async`, or `await`.
-          guarded behind `Platform.isAndroid` plus lazy init.
-        - Directory unavailability is expressed as `null`, never as an exception.
+        - `path_provider_dart` methods are synchronous and return `Directory?`; do not reintroduce `Future`, `async`, or `await`.
 
     - path: "example/lib/**/*.dart"
       instructions: >

@@ -230,6 +230,11 @@ fn sanitize(s: String) -> String {
             }
         })
         .collect();
+    // Re-trim: truncation may have exposed a trailing dot or whitespace that was
+    // preceded by non-whitespace chars earlier in the string.
+    let s: String = s
+        .trim_end_matches(|c: char| c == '.' || c.is_whitespace())
+        .to_string();
     // Windows reserved device names must never be used as file/dir components.
     const RESERVED: &[&str] = &[
         "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
@@ -313,17 +318,19 @@ mod windows_impl {
             };
             if found && len >= 4 && !ptr.is_null() {
                 let count = len as usize / 4;
-                unsafe {
-                    std::slice::from_raw_parts(ptr as *const u32, count)
-                        .iter()
-                        .map(|&pair| {
-                            // Win32 stores pairs as LOWORD=language, HIWORD=codepage.
-                            let lang = (pair & 0xFFFF) as u16;
-                            let cp = (pair >> 16) as u16;
-                            format!("{:04x}{:04x}", lang, cp)
-                        })
-                        .collect()
-                }
+                // Use read_unaligned because `info` is a Vec<u8> (byte-aligned) and
+                // the pointer returned by VerQueryValueW into that buffer may not be
+                // 4-byte aligned. slice::from_raw_parts::<u32> would be UB here.
+                (0..count)
+                    .map(|i| {
+                        let pair = unsafe {
+                            std::ptr::read_unaligned((ptr as *const u8).add(i * 4) as *const u32)
+                        };
+                        let lang = (pair & 0xFFFF) as u16;
+                        let cp = (pair >> 16) as u16;
+                        format!("{:04x}{:04x}", lang, cp)
+                    })
+                    .collect()
             } else {
                 Vec::new()
             }
@@ -919,6 +926,15 @@ mod tests {
         assert_eq!(sanitize("App  ".to_string()), "App");
         assert_eq!(sanitize("App...".to_string()), "App");
         assert_eq!(sanitize("App. ".to_string()), "App");
+        // Truncation at 255 UTF-16 units may expose interior dots at the new tail.
+        // 200 'a's + 100 '.'s + 10 'b's: trim is a no-op (last char is 'b'),
+        // but the scan stops at char 255, which falls inside the dot run.
+        let exposed_dots = "a".repeat(200) + &".".repeat(100) + &"b".repeat(10);
+        let result = sanitize(exposed_dots);
+        assert!(
+            !result.ends_with('.'),
+            "trailing dot must be re-trimmed after truncation, got: {result:?}",
+        );
     }
 
     #[test]

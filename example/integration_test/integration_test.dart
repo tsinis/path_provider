@@ -1,7 +1,7 @@
 import 'dart:convert' show jsonEncode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:path_provider_native_example/comparison.dart' as app;
+import 'package:path_provider_dart_example/comparison.dart' as app;
 
 void main() {
   // ignore: avoid-ignoring-return-values, we don't need return value from it.

@@ -1,14 +1,14 @@
-import 'dart:io' show Directory, Platform;
+import 'dart:io' show Platform;
 
-import 'package:path_provider_native/path_provider_native.dart';
+import 'package:path_provider_dart/path_provider_dart.dart';
 
 void main() {
-  final map = <String, Directory?>{
+  final map = {
     'getApplicationCacheDirectory': getApplicationCacheDirectory(),
+    'getApplicationDocumentsDirectory': getApplicationDocumentsDirectory(),
     'getApplicationSupportDirectory': getApplicationSupportDirectory(),
     'getDownloadsDirectory': getDownloadsDirectory(),
     'getTemporaryDirectory': getTemporaryDirectory(),
-    if (!Platform.isAndroid) 'getApplicationDocumentsDirectory': getApplicationDocumentsDirectory(),
     if (Platform.isIOS || Platform.isMacOS) 'getLibraryDirectory': getLibraryDirectory(),
   };
 

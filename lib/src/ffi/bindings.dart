@@ -2,7 +2,7 @@
 // Hand-written (not ffigen): Rust signatures are trivial and annotations stay readable.
 // ignore_for_file: non_constant_identifier_names, prefer-static-class
 // ignore_for_file: prefer-typedefs-for-callbacks
-@DefaultAsset('package:path_provider_native/src/ffi/bindings.dart')
+@DefaultAsset('package:path_provider_dart/src/ffi/bindings.dart')
 library;
 
 import 'dart:ffi';

@@ -32,8 +32,11 @@ jobs:
       - name: 🎯 Setup Dart
         uses: dart-lang/setup-dart@v1.7.2
 
+      - name: 🏜️ Publish dry-run
+        run: dart pub publish --dry-run
+
       - name: ✂️ Clean Flutter example/
-        run: |
+        run: | # Flutter check has it's own workflow
           find example/ -type f ! -path "example/lib/main.dart" -delete
           find example/ -type d -empty -delete
 
@@ -48,10 +51,6 @@ jobs:
           fail-on-format: true
           format: true
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 🏜️ Publish dry-run
-        if: false # TODO(tsinis) when ready to publish revert to ${{ github.event_name == 'pull_request' }}
-        run: dart pub publish --dry-run
 
       - name: 🧮 Check PANA score
         if: ${{ github.event_name == 'pull_request' }}

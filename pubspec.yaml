@@ -1,6 +1,6 @@
 version: 0.0.1
-name: path_provider_native
-description: "Synchronous, Rust-backed drop-in replacement for path_provider"
+name: path_provider_dart
+description: "Pure Dart, Rust-backed, synchronous replacement for path_provider"
 repository: https://github.com/tsinis/path_provider
 
 environment:

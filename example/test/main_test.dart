@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider/path_provider.dart' as origin;
 import 'package:path_provider_foundation/path_provider_foundation.dart';
 import 'package:path_provider_linux/path_provider_linux.dart';
-import 'package:path_provider_native/path_provider_native.dart' as rust;
+import 'package:path_provider_dart/path_provider_dart.dart' as rust;
 import 'package:path_provider_windows/path_provider_windows.dart';
 
 void main() {

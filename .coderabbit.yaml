@@ -84,7 +84,7 @@ reviews:
       instructions: >
         FFI binding layer — the most safety-critical Dart code in the project.
 
-        - `@Native` annotations must use `@DefaultAsset('package:path_provider_native/src/ffi/bindings.dart')`.
+        - `@Native` annotations must use `@DefaultAsset('package:path_provider_dart/src/ffi/bindings.dart')`.
         - Symbols must exactly match the Rust `#[no_mangle] pub extern "C"` exports (`ppn_*`).
         - Every non-null `*const c_char` returned from Rust must be freed via `ppn_free`
           after being copied into a Dart `String` — the `callDir` helper owns this contract.
@@ -103,7 +103,7 @@ reviews:
     - path: "example/lib/**/*.dart"
       instructions: >
         Flutter example app used for manual and integration testing.
-        - Demonstrate `path_provider_native` alongside Google's `path_provider`
+        - Demonstrate `path_provider_dart` alongside Google's `path_provider`
           for cross-validation. Do not introduce app-level business logic.
 
     - path: "hook/build.dart"
@@ -274,7 +274,7 @@ code_generation:
       - path: "example/lib/**/*.dart"
         instructions: >
           Use `///` dartdoc comments. Document the demo screen's purpose and
-          any `path_provider` vs `path_provider_native` comparisons.
+          any `path_provider` vs `path_provider_dart` comparisons.
   unit_tests:
     path_instructions:
       - path: "src/**/*.rs"

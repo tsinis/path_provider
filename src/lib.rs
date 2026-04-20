@@ -1,4 +1,4 @@
-//! FFI surface for `path_provider_native`.
+//! FFI surface for `path_provider_dart`.
 //!
 //! Every exported symbol is prefixed with `ppn_` and follows the same contract:
 //! - Output strings are heap-allocated by Rust via `CString::into_raw`. The Dart side

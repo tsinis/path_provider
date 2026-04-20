@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "is.tsin.path_provider_native" "\0"
-            VALUE "FileDescription", "path_provider_native_example" "\0"
+            VALUE "CompanyName", "is.tsin.path_provider_dart" "\0"
+            VALUE "FileDescription", "path_provider_dart_example" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "path_provider_native_example" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 is.tsin.path_provider_native. All rights reserved." "\0"
-            VALUE "OriginalFilename", "path_provider_native_example.exe" "\0"
-            VALUE "ProductName", "path_provider_native_example" "\0"
+            VALUE "InternalName", "path_provider_dart_example" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 is.tsin.path_provider_dart. All rights reserved." "\0"
+            VALUE "OriginalFilename", "path_provider_dart_example.exe" "\0"
+            VALUE "ProductName", "path_provider_dart_example" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

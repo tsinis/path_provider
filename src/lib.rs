@@ -265,7 +265,163 @@ mod linux {
     }
 }
 
-// ─── Free ────────────────────────────────────────────────────────────────────
+// ─── Windows helpers ─────────────────────────────────────────────────────────
+
+#[cfg(target_os = "windows")]
+mod windows_impl {
+    use std::path::PathBuf;
+
+    /// Returns `"CompanyName\ProductName"` read from the running exe's version
+    /// resource, falling back to just the exe filename stem when unavailable.
+    pub(crate) fn app_subfolder() -> String {
+        version_info_subfolder().unwrap_or_else(|| exe_stem().unwrap_or_else(|| "App".to_string()))
+    }
+
+    fn version_info_subfolder() -> Option<String> {
+        use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW};
+        use windows::Win32::System::LibraryLoader::GetModuleFileNameW;
+        use windows::core::PCWSTR;
+
+        unsafe {
+            let mut buf = [0u16; 260];
+            let len = GetModuleFileNameW(None, &mut buf);
+            if len == 0 {
+                return None;
+            }
+            let exe_path = PCWSTR(buf.as_ptr());
+
+            let mut dummy = 0u32;
+            let size = GetFileVersionInfoSizeW(exe_path, Some(&mut dummy));
+            if size == 0 {
+                return None;
+            }
+
+            let mut info = vec![0u8; size as usize];
+            GetFileVersionInfoW(exe_path, Some(0), size, info.as_mut_ptr() as *mut _).ok()?;
+
+            let product = sanitize(query_string_value(&info, "ProductName")?);
+            if product.is_empty() {
+                return None;
+            }
+            let company = query_string_value(&info, "CompanyName")
+                .map(sanitize)
+                .filter(|s| !s.is_empty());
+
+            Some(match company {
+                Some(c) => format!("{}\\{}", c, product),
+                None => product,
+            })
+        }
+    }
+
+    fn query_string_value(info: &[u8], key: &str) -> Option<String> {
+        use windows::Win32::Storage::FileSystem::VerQueryValueW;
+        use windows::core::PCWSTR;
+
+        // Try code-page 1252 then Unicode; both use language 0409 (en-US).
+        for enc in &["04e4", "04b0"] {
+            let sub_block: Vec<u16> = format!("\\StringFileInfo\\0409{}\\{}", enc, key)
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+            let mut ptr = std::ptr::null_mut();
+            let mut len = 0u32;
+            let found = unsafe {
+                VerQueryValueW(
+                    info.as_ptr() as *const _,
+                    PCWSTR(sub_block.as_ptr()),
+                    &mut ptr,
+                    &mut len,
+                )
+                .as_bool()
+            };
+            if found && len > 0 {
+                let s = unsafe {
+                    let slice = std::slice::from_raw_parts(ptr as *const u16, len as usize);
+                    let end = slice.iter().position(|&c| c == 0).unwrap_or(slice.len());
+                    String::from_utf16(&slice[..end]).ok()
+                };
+                if s.is_some() {
+                    return s;
+                }
+            }
+        }
+        None
+    }
+
+    fn sanitize(s: String) -> String {
+        let s: String = s
+            .chars()
+            .map(|c| if "<>:\"/\\|?*".contains(c) { '_' } else { c })
+            .collect();
+        s.trim_end_matches(|c: char| c == '.' || c.is_whitespace())
+            .chars()
+            .take(255)
+            .collect()
+    }
+
+    fn exe_stem() -> Option<String> {
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.file_stem()?.to_str().map(String::from))
+    }
+
+    /// Base dir + app subfolder. Creates the directory eagerly (matches macOS behavior).
+    pub(crate) fn scoped(base: Option<PathBuf>) -> Option<PathBuf> {
+        let path = base?;
+        let result = path.join(app_subfolder());
+        let _ = std::fs::create_dir_all(&result);
+        Some(result)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn sanitize_replaces_illegal_chars() {
+            assert_eq!(sanitize("My:Company".to_string()), "My_Company");
+            assert_eq!(sanitize("App/Name".to_string()), "App_Name");
+            assert_eq!(sanitize("A<B>C".to_string()), "A_B_C");
+        }
+
+        #[test]
+        fn sanitize_trims_trailing_dots_and_spaces() {
+            assert_eq!(sanitize("App  ".to_string()), "App");
+            assert_eq!(sanitize("App...".to_string()), "App");
+            assert_eq!(sanitize("App. ".to_string()), "App");
+        }
+
+        #[test]
+        fn sanitize_limits_to_255_chars() {
+            let long = "a".repeat(300);
+            assert_eq!(sanitize(long).len(), 255);
+        }
+
+        #[test]
+        fn exe_stem_is_non_empty() {
+            assert!(exe_stem().is_some_and(|s| !s.is_empty()));
+        }
+
+        #[test]
+        fn app_subfolder_is_non_empty() {
+            // Under flutter_tester.exe there is no version resource, so this
+            // falls back to the exe stem — still must be non-empty.
+            assert!(!app_subfolder().is_empty());
+        }
+
+        #[test]
+        fn scoped_extends_base() {
+            if let Some(base) = dirs::cache_dir() {
+                let result = scoped(Some(base.clone()));
+                assert!(result.is_some(), "scoped must return Some for a valid base");
+                let s = result.unwrap();
+                assert!(s.starts_with(&base), "scoped path must extend the base");
+                assert_ne!(s, base, "scoped path must include the app subfolder");
+            }
+        }
+    }
+}
 
 /// Free a C string previously returned by any `ppn_*` getter. Null-safe.
 ///
@@ -326,7 +482,21 @@ pub unsafe extern "C" fn ppn_temp_dir() -> *const c_char {
         {
             to_cstr(with_bundle_id(dirs::cache_dir()))
         }
-        #[cfg(not(any(target_os = "android", target_os = "ios", target_os = "macos")))]
+        #[cfg(target_os = "windows")]
+        {
+            // std::env::temp_dir() appends a trailing separator on Windows;
+            // strip it to match what path_provider_windows returns.
+            let tmp = std::env::temp_dir();
+            let s = tmp.to_str().unwrap_or("");
+            let s = s.trim_end_matches(['\\', '/']);
+            to_cstr(Some(PathBuf::from(s)))
+        }
+        #[cfg(not(any(
+            target_os = "android",
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "windows"
+        )))]
         {
             to_cstr(Some(std::env::temp_dir()))
         }
@@ -356,7 +526,16 @@ pub unsafe extern "C" fn ppn_cache_dir() -> *const c_char {
         {
             to_cstr(linux::scoped(dirs::cache_dir()))
         }
-        #[cfg(not(any(target_os = "android", target_os = "macos", target_os = "linux")))]
+        #[cfg(target_os = "windows")]
+        {
+            to_cstr(windows_impl::scoped(dirs::cache_dir()))
+        }
+        #[cfg(not(any(
+            target_os = "android",
+            target_os = "macos",
+            target_os = "linux",
+            target_os = "windows"
+        )))]
         {
             to_cstr(dirs::cache_dir())
         }
@@ -385,7 +564,16 @@ pub unsafe extern "C" fn ppn_data_dir() -> *const c_char {
         {
             to_cstr(linux::scoped(dirs::data_dir()))
         }
-        #[cfg(not(any(target_os = "android", target_os = "macos", target_os = "linux")))]
+        #[cfg(target_os = "windows")]
+        {
+            to_cstr(windows_impl::scoped(dirs::data_dir()))
+        }
+        #[cfg(not(any(
+            target_os = "android",
+            target_os = "macos",
+            target_os = "linux",
+            target_os = "windows"
+        )))]
         {
             to_cstr(dirs::data_dir())
         }
@@ -563,5 +751,76 @@ mod tests {
         assert_ne!(temp_cache, support);
         assert_ne!(temp_cache, documents);
         assert_ne!(support, documents);
+    }
+
+    // ── Windows-specific tests ────────────────────────────────────────────────
+
+    /// This logic runs on every platform — validates the separator-stripping
+    /// formula used inside ppn_temp_dir on Windows.
+    #[test]
+    fn temp_dir_separator_stripping_logic() {
+        for (input, expected) in &[
+            ("C:\\Windows\\Temp\\", "C:\\Windows\\Temp"),
+            ("C:\\Windows\\Temp", "C:\\Windows\\Temp"),
+            ("/tmp/", "/tmp"),
+            ("/tmp", "/tmp"),
+        ] {
+            let stripped = input.trim_end_matches(['\\', '/']);
+            assert_eq!(stripped, *expected, "input: {input:?}");
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn windows_temp_dir_has_no_trailing_separator() {
+        let ptr = unsafe { ppn_temp_dir() };
+        assert!(
+            !ptr.is_null(),
+            "ppn_temp_dir must not return null on Windows"
+        );
+        let s = unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str().unwrap();
+        assert!(
+            !s.ends_with('\\') && !s.ends_with('/'),
+            "trailing separator must be stripped, got: {s:?}",
+        );
+        unsafe { ppn_free(ptr as *mut c_char) };
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn windows_cache_dir_is_scoped() {
+        let base = dirs::cache_dir().expect("cache dir must exist on Windows");
+        let ptr = unsafe { ppn_cache_dir() };
+        assert!(!ptr.is_null());
+        let s = unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str().unwrap();
+        let scoped = std::path::Path::new(s);
+        assert!(
+            scoped.starts_with(&base),
+            "cache dir must be inside the base: {s:?}"
+        );
+        assert_ne!(
+            scoped, base,
+            "cache dir must include the app subfolder suffix"
+        );
+        unsafe { ppn_free(ptr as *mut c_char) };
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn windows_data_dir_is_scoped() {
+        let base = dirs::data_dir().expect("data dir must exist on Windows");
+        let ptr = unsafe { ppn_data_dir() };
+        assert!(!ptr.is_null());
+        let s = unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str().unwrap();
+        let scoped = std::path::Path::new(s);
+        assert!(
+            scoped.starts_with(&base),
+            "data dir must be inside the base: {s:?}"
+        );
+        assert_ne!(
+            scoped, base,
+            "data dir must include the app subfolder suffix"
+        );
+        unsafe { ppn_free(ptr as *mut c_char) };
     }
 }

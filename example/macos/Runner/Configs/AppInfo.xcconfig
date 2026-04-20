@@ -8,7 +8,7 @@
 PRODUCT_NAME = path_provider_dart_example
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = is.tsin.pathprovidernative.pathProviderNativeExample
+PRODUCT_BUNDLE_IDENTIFIER = is.tsin.pathproviderdart.pathProviderDartExample
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 is.tsin.path_provider_dart. All rights reserved.

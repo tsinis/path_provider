@@ -36,7 +36,7 @@ jobs:
         run: dart pub publish --dry-run
 
       - name: ✂️ Clean Flutter example/
-        run: | # Flutter check has it's own workflow
+        run: | # Flutter check has its own workflow
           find example/ -type f ! -path "example/lib/main.dart" -delete
           find example/ -type d -empty -delete
 

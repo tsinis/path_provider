@@ -321,13 +321,11 @@ mod windows_impl {
         use windows::Win32::Storage::FileSystem::VerQueryValueW;
         use windows::core::PCWSTR;
 
-        // Try code-page 1252 then Unicode; both use language 0409 (en-US).
-        for enc in &["04e4", "04b0"] {
-            let sub_block: Vec<u16> = format!("\\StringFileInfo\\0409{}\\{}", enc, key)
-                .encode_utf16()
-                .chain(std::iter::once(0))
-                .collect();
-            let mut ptr = std::ptr::null_mut();
+        // Read the available language+codepage pairs from the version resource.
+        // Each pair is a u32 encoded as (language: u16, codepage: u16).
+        let translations: Vec<String> = {
+            let sub_block: Vec<u16> = "\\VarFileInfo\\Translation\0".encode_utf16().collect();
+            let mut ptr = std::ptr::null_mut::<std::ffi::c_void>();
             let mut len = 0u32;
             let found = unsafe {
                 VerQueryValueW(
@@ -338,7 +336,48 @@ mod windows_impl {
                 )
                 .as_bool()
             };
-            if found && len > 0 {
+            if found && len >= 4 && !ptr.is_null() {
+                let count = len as usize / 4;
+                unsafe {
+                    std::slice::from_raw_parts(ptr as *const u32, count)
+                        .iter()
+                        .map(|&pair| {
+                            // Win32 stores pairs as LOWORD=language, HIWORD=codepage.
+                            let lang = (pair & 0xFFFF) as u16;
+                            let cp = (pair >> 16) as u16;
+                            format!("{:04x}{:04x}", lang, cp)
+                        })
+                        .collect()
+                }
+            } else {
+                Vec::new()
+            }
+        };
+
+        // Iterate discovered translations, then fall back to common en-US encodings.
+        let fallback = &["04090000", "040904e4", "040904b0"];
+        let candidates: Vec<&str> = translations
+            .iter()
+            .map(String::as_str)
+            .chain(fallback.iter().copied())
+            .collect();
+
+        for enc in candidates {
+            let sub_block: Vec<u16> = format!("\\StringFileInfo\\{}\\{}\0", enc, key)
+                .encode_utf16()
+                .collect();
+            let mut ptr = std::ptr::null_mut::<std::ffi::c_void>();
+            let mut len = 0u32;
+            let found = unsafe {
+                VerQueryValueW(
+                    info.as_ptr() as *const _,
+                    PCWSTR(sub_block.as_ptr()),
+                    &mut ptr,
+                    &mut len,
+                )
+                .as_bool()
+            };
+            if found && len > 0 && !ptr.is_null() {
                 let s = unsafe {
                     let slice = std::slice::from_raw_parts(ptr as *const u16, len as usize);
                     let end = slice.iter().position(|&c| c == 0).unwrap_or(slice.len());
@@ -353,14 +392,32 @@ mod windows_impl {
     }
 
     fn sanitize(s: String) -> String {
+        const ILLEGAL: &str = "<>:\"/\\|?*";
+        // Replace path-illegal characters and ASCII control characters.
         let s: String = s
             .chars()
-            .map(|c| if "<>:\"/\\|?*".contains(c) { '_' } else { c })
+            .map(|c| {
+                if c.is_control() || ILLEGAL.contains(c) {
+                    '_'
+                } else {
+                    c
+                }
+            })
             .collect();
-        s.trim_end_matches(|c: char| c == '.' || c.is_whitespace())
+        let s: String = s
+            .trim_end_matches(|c: char| c == '.' || c.is_whitespace())
             .chars()
             .take(255)
-            .collect()
+            .collect();
+        // Windows reserved device names must never be used as file/dir components.
+        const RESERVED: &[&str] = &[
+            "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
+            "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        ];
+        if RESERVED.iter().any(|&r| s.eq_ignore_ascii_case(r)) {
+            return format!("_{s}");
+        }
+        s
     }
 
     fn exe_stem() -> Option<String> {
@@ -389,6 +446,13 @@ mod windows_impl {
         }
 
         #[test]
+        fn sanitize_replaces_control_chars() {
+            assert_eq!(sanitize("App\x00Name".to_string()), "App_Name");
+            assert_eq!(sanitize("App\tName".to_string()), "App_Name");
+            assert_eq!(sanitize("App\nName".to_string()), "App_Name");
+        }
+
+        #[test]
         fn sanitize_trims_trailing_dots_and_spaces() {
             assert_eq!(sanitize("App  ".to_string()), "App");
             assert_eq!(sanitize("App...".to_string()), "App");
@@ -399,6 +463,35 @@ mod windows_impl {
         fn sanitize_limits_to_255_chars() {
             let long = "a".repeat(300);
             assert_eq!(sanitize(long).len(), 255);
+        }
+
+        #[test]
+        fn sanitize_prefixes_reserved_names() {
+            for name in &["CON", "PRN", "AUX", "NUL", "con", "nul"] {
+                let result = sanitize(name.to_string());
+                assert!(
+                    result.starts_with('_'),
+                    "reserved name {name:?} must be prefixed, got {result:?}",
+                );
+            }
+            for n in 1..=9u8 {
+                for prefix in &["COM", "LPT"] {
+                    let name = format!("{prefix}{n}");
+                    let result = sanitize(name.clone());
+                    assert!(
+                        result.starts_with('_'),
+                        "reserved name {name:?} must be prefixed, got {result:?}",
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn sanitize_keeps_safe_names() {
+            // These are NOT reserved and must pass through unchanged.
+            assert_eq!(sanitize("MyCompany".to_string()), "MyCompany");
+            assert_eq!(sanitize("CONSOLE".to_string()), "CONSOLE");
+            assert_eq!(sanitize("COM10".to_string()), "COM10");
         }
 
         #[test]
@@ -488,10 +581,20 @@ pub unsafe extern "C" fn ppn_temp_dir() -> *const c_char {
         #[cfg(target_os = "windows")]
         {
             // std::env::temp_dir() appends a trailing separator on Windows;
-            // strip it to match what path_provider_windows returns.
+            // strip it to match what path_provider_windows returns, but never
+            // strip the root separator of a bare drive (e.g. "C:\").
             let tmp = std::env::temp_dir();
-            let s = tmp.to_str().unwrap_or("");
-            let s = s.trim_end_matches(['\\', '/']);
+            let Some(s) = tmp.to_str() else {
+                return to_cstr(None);
+            };
+            // A bare drive root like "C:\" must keep its backslash; trim only
+            // when doing so would not leave a naked drive letter.
+            let is_drive_root = s.len() == 3 && s.ends_with(":\\");
+            let s = if is_drive_root {
+                s
+            } else {
+                s.trim_end_matches(['\\', '/'])
+            };
             to_cstr(Some(PathBuf::from(s)))
         }
         #[cfg(not(any(
@@ -761,17 +864,36 @@ mod tests {
     // ── Windows-specific tests ────────────────────────────────────────────────
 
     /// This logic runs on every platform — validates the separator-stripping
-    /// formula used inside ppn_temp_dir on Windows.
+    /// formula used inside ppn_temp_dir on Windows, including the root-drive guard.
     #[test]
     fn temp_dir_separator_stripping_logic() {
+        // Normal paths: trailing separator must be removed.
         for (input, expected) in &[
             ("C:\\Windows\\Temp\\", "C:\\Windows\\Temp"),
             ("C:\\Windows\\Temp", "C:\\Windows\\Temp"),
             ("/tmp/", "/tmp"),
             ("/tmp", "/tmp"),
         ] {
-            let stripped = input.trim_end_matches(['\\', '/']);
+            let is_drive_root = input.len() == 3 && input.ends_with(":\\");
+            let stripped = if is_drive_root {
+                input
+            } else {
+                input.trim_end_matches(['\\', '/'])
+            };
             assert_eq!(stripped, *expected, "input: {input:?}");
+        }
+        // Root drives must NOT have their separator stripped.
+        for root in &["C:\\", "D:\\", "Z:\\"] {
+            let is_drive_root = root.len() == 3 && root.ends_with(":\\");
+            let stripped = if is_drive_root {
+                *root
+            } else {
+                root.trim_end_matches(['\\', '/'])
+            };
+            assert_eq!(
+                stripped, *root,
+                "root drive {root:?} must keep its separator"
+            );
         }
     }
 

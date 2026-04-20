@@ -105,5 +105,5 @@ flutter run                                              # pick a device
 flutter test integration_test/                           # integration tests
 ```
 
-The example app mounts both `PathProviderNative` and Google's `path_provider`
+The example app mounts both `path_provider_dart` and Google's `path_provider`
 side by side so parity can be validated on-device.

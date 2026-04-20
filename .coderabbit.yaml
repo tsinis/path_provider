@@ -92,11 +92,10 @@ reviews:
 
     - path: "lib/src/**/*.dart"
       instructions: >
-        Public Dart API (almost pure Dart).
+        Public Dart API (pure Dart).
 
-        - `PathProviderNative` getters are synchronous and return `Directory?`; do not
+        - `path_provider_dart` methods are synchronous and return `Directory?`; do not
           reintroduce `Future`, `async`, or `await`.
-        - `package:jni` must only be touched inside the Android-only helper, and only
           guarded behind `Platform.isAndroid` plus lazy init.
         - Directory unavailability is expressed as `null`, never as an exception.
 

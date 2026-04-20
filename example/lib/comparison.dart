@@ -2,7 +2,7 @@
 import 'dart:io' show Directory, Platform;
 
 import 'package:path_provider/path_provider.dart' as origin;
-import 'package:path_provider_native/path_provider_native.dart' as rust;
+import 'package:path_provider_dart/path_provider_dart.dart' as rust;
 
 @pragma('vm:deeply-immutable')
 final class Comparison {

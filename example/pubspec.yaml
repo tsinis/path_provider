@@ -1,6 +1,6 @@
 version: 0.0.1+0
-name: path_provider_native_example
-description: "Demonstrates path_provider_native alongside Google's path_provider for parity checks."
+name: path_provider_dart_example
+description: "Demonstrates path_provider_dart alongside original path_provider for parity checks."
 publish_to: none
 
 environment:
@@ -10,7 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   path_provider: ^2.1.5
-  path_provider_native:
+  path_provider_dart:
     path: ../
 
 dev_dependencies:

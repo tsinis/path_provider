@@ -1,16 +1,16 @@
-# path_provider_native
+# path_provider_dart
 
 Synchronous, await-free pure Dart drop-in replacement for [`path_provider`](https://pub.dev/packages/path_provider).
 Rust-powered via `dart:ffi`; no platform channels, no `Future`s, no platform folders.
 
 ## Layout
 
-| Path                              | Role                                                                                                 |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `Cargo.toml` / `src/`             | Rust crate `path_provider_native` — wraps `dirs` (non-Android) and `/proc`-based detection (Android) |
-| `lib/` / `test/` / `pubspec.yaml` | Pure Dart package published to pub.dev                                                               |
-| `hook/build.dart`                 | `native_toolchain_rust` build hook (emits code assets)                                               |
-| `example/`                        | Flutter sample and integration tests; also depends on Google's `path_provider` for cross-validation  |
+| Path                              | Role                                                                                                |
+| --------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `Cargo.toml` / `src/`             | Rust crate `path_provider` — wraps `dirs` (non-Android) and `/proc`-based detection (Android)       |
+| `lib/` / `test/` / `pubspec.yaml` | Pure Dart package published to pub.dev                                                              |
+| `hook/build.dart`                 | `native_toolchain_rust` build hook (emits code assets)                                              |
+| `example/`                        | Flutter sample and integration tests; also depends on Google's `path_provider` for cross-validation |
 
 Rust and Dart are first-class citizens at the repo root. Flutter only enters the picture through `example/`.
 
@@ -29,8 +29,8 @@ Rust and Dart are first-class citizens at the repo root. Flutter only enters the
 import 'package:path_provider/path_provider.dart';
 final dir = await getApplicationCacheDirectory();
 
-// After (path_provider_native)
-import 'package:path_provider_native/path_provider_native.dart';
+// After (path_provider_dart)
+import 'package:path_provider_dart/path_provider_dart.dart';
 final dir = getApplicationCacheDirectory();
 ```
 
@@ -38,7 +38,7 @@ Same function names, same `Directory` return types, same nullability, same
 `MissingPlatformDirectoryException` / `UnsupportedError` semantics — just no
 `Future` and no `await`.
 
-| `path_provider` (async)                    | `path_provider_native` (sync)        |
+| `path_provider` (async)                    | `path_provider_dart` (sync)          |
 | ------------------------------------------ | ------------------------------------ |
 | `await getTemporaryDirectory()`            | `getTemporaryDirectory()`            |
 | `await getApplicationCacheDirectory()`     | `getApplicationCacheDirectory()`     |
@@ -63,7 +63,7 @@ Three thin layers, all synchronous:
 │       │                                                            │
 │       ▼ symbol resolution via @DefaultAsset + native_toolchain_rust│
 │                                                                    │
-│ src/lib.rs — ppn_* exports (dirs + /proc on Android) │
+│ src/lib.rs — ppn_* exports (dirs + /proc on Android)               │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -105,5 +105,5 @@ flutter run                                              # pick a device
 flutter test integration_test/                           # integration tests
 ```
 
-The example app mounts both `PathProviderNative` and Google's `path_provider`
+The example app mounts both `path_provider_dart` and original `path_provider`
 side by side so parity can be validated on-device.

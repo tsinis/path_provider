@@ -32,8 +32,11 @@ jobs:
       - name: 🎯 Setup Dart
         uses: dart-lang/setup-dart@v1.7.2
 
+      - name: 🏜️ Publish dry-run
+        run: dart pub publish --dry-run
+
       - name: ✂️ Clean Flutter example/
-        run: |
+        run: | # Flutter check has its own workflow
           find example/ -type f ! -path "example/lib/main.dart" -delete
           find example/ -type d -empty -delete
 
@@ -49,10 +52,6 @@ jobs:
           format: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🏜️ Publish dry-run
-        if: false # TODO(tsinis) when ready to publish revert to ${{ github.event_name == 'pull_request' }}
-        run: dart pub publish --dry-run
-
       - name: 🧮 Check PANA score
         if: ${{ github.event_name == 'pull_request' }}
         # sudo apt-get install -y webp # TODO(tsinis) - add when screenshot is added to pubspec.
@@ -61,7 +60,7 @@ jobs:
           dart pub global run pana . --no-warning --exit-code-threshold 20
 
       - name: 🧪 Run tests with coverage # TODO(tsinis) - adjust --fail-under value.
-        run: dart run coverage:test_with_coverage --fail-under=1
+        run: dart run coverage:test_with_coverage --fail-under=36
 
       - name: 💯 Upload to Codecov
         uses: codecov/codecov-action@v6.0.0

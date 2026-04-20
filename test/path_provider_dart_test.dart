@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:path_provider_native/path_provider_native.dart';
+import 'package:path_provider_dart/path_provider_dart.dart';
 import 'package:test/test.dart';
 
 void main() {

@@ -248,9 +248,9 @@ mod linux {
             Some(id) => path.join(id),
             None => path,
         };
-        if std::fs::create_dir_all(&result).is_err() {
-            return None;
-        }
+        // Attempt eager creation; return the path regardless so callers can
+        // decide how to handle an unwritable location (consistent with macOS).
+        let _ = std::fs::create_dir_all(&result);
         Some(result)
     }
 
@@ -283,11 +283,14 @@ mod windows_impl {
         use windows::core::PCWSTR;
 
         unsafe {
-            let mut buf = [0u16; 260];
-            let len = GetModuleFileNameW(None, &mut buf);
-            if len == 0 {
+            // Use 261 to always have a null slot beyond the 260-char write window.
+            // If the path fills all 260 slots it was truncated — reject it.
+            let mut buf = [0u16; 261];
+            let len = GetModuleFileNameW(None, &mut buf[..260]);
+            if len == 0 || len >= 260 {
                 return None;
             }
+            // buf[len] is 0 from zero-initialization, so PCWSTR is safe.
             let exe_path = PCWSTR(buf.as_ptr());
 
             let mut dummy = 0u32;
@@ -730,11 +733,13 @@ mod tests {
 
     #[test]
     #[cfg(target_os = "linux")]
-    fn linux_scoped_returns_none_for_unwritable_dir() {
+    fn linux_scoped_returns_path_even_when_dir_unwritable() {
+        // scoped must return Some regardless of create_dir_all success —
+        // consistent with macOS: callers decide how to handle unwritable paths.
         let result = linux::scoped(Some(std::path::PathBuf::from("/proc/ppn_test_unwritable")));
         assert!(
-            result.is_none(),
-            "scoped must return None for unwritable dir"
+            result.is_some(),
+            "scoped must return Some even when the directory cannot be created",
         );
     }
 
